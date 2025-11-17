@@ -217,7 +217,7 @@ namespace FailCake.VMF
         private void CreateColliderObject((Bounds bounds, string material) data, int solidId, GameObject colliderRoot) {
             GameObject colliderObj = new GameObject($"collider_{solidId}");
 
-            int collisionLayer = VMFImporter.Settings.collisionMask;
+            int collisionLayer = LayerMask.NameToLayer(VMFImporter.Settings.collisionMask);
             if (collisionLayer != -1) colliderObj.layer = collisionLayer;
 
             colliderObj.transform.SetParent(colliderRoot.transform, false);
