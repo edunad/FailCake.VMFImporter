@@ -6,8 +6,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityMeshSimplifier;
-using ZLinq;
-using ZLinq.Linq;
+using System.Linq;
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.AssetImporters;
@@ -183,9 +182,8 @@ namespace FailCake.VMF
             colliderRoot.transform.SetParent(rootModel.transform, false);
             colliderRoot.isStatic = true;
 
-            ValueEnumerable<WhereSelect<SelectMany<FromList<VMFSolid>, FromArray<(VMFSolid solid, (Bounds bounds, string material)? bounds)>, VMFSolid, (VMFSolid solid, (Bounds bounds, string material)? bounds)>, (VMFSolid solid, (Bounds bounds, string
-                material)? bounds), (Bounds bounds, string material)>, (Bounds bounds, string material)> colliderData = solids.AsValueEnumerable()
-                .SelectMany(solid => new[] { (solid, bounds: this.GetBoundsForSolid(solid)) }.AsValueEnumerable())
+            var colliderData = solids
+                .SelectMany(solid => new[] { (solid, bounds: this.GetBoundsForSolid(solid)) })
                 .Where(x => x.bounds.HasValue && this.IsBoundsValid(x.bounds.Value.bounds))
                 .Select(x => (x.bounds.Value.bounds, material: calculateMaterials ? this.GetDominantMaterial(x.solid) : "default"));
 
@@ -196,11 +194,11 @@ namespace FailCake.VMF
         private (Bounds bounds, string material)? GetBoundsForSolid(VMFSolid solid) {
             if (solid?.sides == null || solid.sides.Count == 0) return null;
 
-            ValueEnumerable<Select<SelectMany<FromList<VMFSide>, VMFSide, Vertex>, Vertex, Vector3>, Vector3> vertices = solid.sides.AsValueEnumerable()
+            var vertices = solid.sides
                 .SelectMany(side => side.vertices)
                 .Select(vertex => VMFMesh.GetDefaultTransform().MultiplyPoint3x4(vertex.position));
 
-            if (vertices.Count() == 0) return null;
+            if (!vertices.Any()) return null;
 
             Vector3 min = vertices.Aggregate(Vector3.positiveInfinity, Vector3.Min);
             Vector3 max = vertices.Aggregate(Vector3.negativeInfinity, Vector3.Max);
@@ -249,18 +247,18 @@ namespace FailCake.VMF
         private string GetDominantMaterial(VMFSolid solid) {
             if (solid?.sides == null || solid.sides.Count == 0) return null;
 
-            ValueEnumerable<ListWhere<VMFSide>, VMFSide> filteredSides = solid.sides.AsValueEnumerable()
+            var filteredSides = solid.sides
                 .Where(side =>
                     !string.IsNullOrEmpty(side.material) &&
                     (!VMFImporter.Settings.GetMaterialOverride(side.material) ||
                      side.material.Contains("LAYER_TEXTURE", StringComparison.OrdinalIgnoreCase))
                 );
 
-            if (filteredSides.Count() == 0) return null;
+            if (!filteredSides.Any()) return null;
 
             var materialWithMaxCount = filteredSides
                 .GroupBy(side => side.material)
-                .Select(g => new { Material = g.Key, Count = g.AsValueEnumerable().Count() })
+                .Select(g => new { Material = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .FirstOrDefault();
 

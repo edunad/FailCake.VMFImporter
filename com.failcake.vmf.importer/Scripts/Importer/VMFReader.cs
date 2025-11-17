@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
-using ZLinq;
+using System.Linq;
 
 #endregion
 
@@ -46,7 +46,7 @@ namespace FailCake.VMF
 
         public T[] GetAll<T>()
         {
-            return this.variables.AsValueEnumerable()
+            return this.variables
                 .Select(x => x.value)
                 .OfType<T>()
                 .ToArray();
@@ -60,7 +60,7 @@ namespace FailCake.VMF
             }
 
             return this.variables
-                .FindAll(x => x.name == key).AsValueEnumerable()
+                .FindAll(x => x.name == key)
                 .Select(x => x.value as string)
                 .OfType<string>()
                 .ToArray();
@@ -74,7 +74,7 @@ namespace FailCake.VMF
             }
 
             return this.variables
-                .FindAll(x => x.name == key).AsValueEnumerable()
+                .FindAll(x => x.name == key)
                 .Select(x => x.value as VMFDataBlock)
                 .OfType<VMFDataBlock>()
                 .ToArray();
@@ -196,7 +196,7 @@ namespace FailCake.VMF
                     {
                         VMFReader.ParseNamedBlock(line, reader, stack[^1]);
                     }
-                } while (stack.AsValueEnumerable().Any());
+                } while (stack.Any());
             }
             catch (System.Exception ex)
             {

@@ -3,8 +3,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using ZLinq;
-using ZLinq.Linq;
+using System.Linq;
 
 #endregion
 
@@ -23,8 +22,8 @@ namespace FailCake.VMF
                 return false;
             }
 
-            ValueEnumerable<FromArray<VMFDataBlock>, VMFDataBlock> dataSides = solidDataBlock.GetAllBlocks("side").AsValueEnumerable();
-            if (dataSides.Count() == 0)
+            var dataSides = solidDataBlock.GetAllBlocks("side");
+            if (dataSides.Length == 0)
             {
                 Debug.LogWarning($"No sides found in solid {this.ID}");
                 return false;
@@ -487,9 +486,7 @@ namespace FailCake.VMF
             if (rows == null || rows.Length == 0) return Array.Empty<float[]>();
 
             return rows
-                .AsValueEnumerable()
                 .Select(row => row.Split(' ')
-                    .AsValueEnumerable()
                     .Where(value => !string.IsNullOrWhiteSpace(value))
                     .Select(s => float.TryParse(s, out float result) ? result : 0f)
                     .ToArray())

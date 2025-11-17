@@ -3,7 +3,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using ZLinq;
+using System.Linq;
 
 #endregion
 
@@ -27,11 +27,11 @@ namespace FailCake.VMF
 
             try
             {
-                this._worldBlock = this._root.AsValueEnumerable().Where(data => data.ID == "world").FirstOrDefault();
+                this._worldBlock = this._root.Where(data => data.ID == "world").FirstOrDefault();
                 if (this._worldBlock == null) throw new UnityException("World block not found in VMF data - invalid VMF format");
 
-                this._solids = this._worldBlock.GetAllBlocks("solid").AsValueEnumerable().ToList();
-                this._entities = this._root.AsValueEnumerable().Where(data => data.ID == "entity").ToList();
+                this._solids = this._worldBlock.GetAllBlocks("solid").ToList();
+                this._entities = this._root.Where(data => data.ID == "entity").ToList();
                 this._entitySolids = this.ProcessEntitySolids();
             }
             catch (Exception ex)
@@ -127,7 +127,7 @@ namespace FailCake.VMF
 
             try
             {
-                return solid.GetAllBlocks("side").AsValueEnumerable().ToList();
+                return solid.GetAllBlocks("side").ToList();
             }
             catch (Exception ex)
             {
