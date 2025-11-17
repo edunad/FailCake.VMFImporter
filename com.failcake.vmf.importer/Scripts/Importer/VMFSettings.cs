@@ -40,7 +40,7 @@ namespace FailCake.VMF
         public List<MaterialOverride> layerMaterials = new List<MaterialOverride>();
 
         [Space(3), Header("Collision")]
-        public LayerMask collisionMask;
+        public string collisionMask; // LayerMask not working correctly for some reason
 
         #region PRIVATE
 
