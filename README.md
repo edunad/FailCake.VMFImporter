@@ -21,6 +21,9 @@
 
 > [!IMPORTANT]
 > Originally built for [Delivery & Beyond](https://store.steampowered.com/app/3376480/Delivery__Beyond/), not really intended for public use. But after thinking about it, figured I'd share it anyway. Some stuff is still hardcoded for the game, but eventually I want to turn this into a proper plugin.
+> 
+> [!IMPORTANT]
+> Requires the [UnityMeshSimplifier](https://github.com/Whinarn/UnityMeshSimplifier) package (to simplify the meshes)
 
 <img width="512" height="512" alt="{F9280638-B3EB-4238-BFB4-7B0228BD40B1}" src="https://i.rawr.dev/O7lmnfXlCI.gif" />
 <img width="712" height="157" alt="{6D9959EA-294A-4093-ADE8-F6AD30858708}" src="https://github.com/user-attachments/assets/c2522b95-f474-4d91-a805-2cbad3c0f993" />
@@ -30,6 +33,7 @@
 
 Open Unity's Package Manager and add a new Git URL:
 ```
+https://github.com/Whinarn/UnityMeshSimplifier.git
 https://github.com/edunad/FailCake.VMFImporter.git?path=/com.failcake.vmf.importer
 ```
 
