@@ -1,0 +1,20 @@
+{
+    "name": "VFMImporterEditor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:cc235d236a8b0fa4385ec891c3af101a",
+        "GUID:77ccaf49895b0d64e87cd4b4faf83c49",
+        "GUID:df380645f10b7bc4b97d4f5eb6303d95"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
