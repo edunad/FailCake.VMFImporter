@@ -51,24 +51,24 @@ https://github.com/edunad/FailCake.VMFImporter.git?path=/com.failcake.vmf.import
 
 ## Issues
 **Texture arrays get duplicated for each VMF model:**
-- Tried making a central VTF database but ran into too many problems. Might revisit this later.
+- Tried making a global VTF database but ran into too many problems. Might try again later.
 
 **Displacement heights don't match Hammer exactly:**
-- The math gets wonky if you create a displacement and then resize it in Hammer. Need to fix the calculation at some point :P
+- The size gets weird if you create a displacement and then resize it in Hammer. Need to fix the calculation at some point :P
 
 **Texture sizes can break:**
-- Your textures need to be power of 2 (64x64, 128x128, etc) or things get weird.
+- Your textures need to be power of 2 (64x64, 128x128, etc)
 
 **Textures are not transparent:**
-- Transparent textures at the moment use alpha clipping, not actual transparency. This will change in the future
+- Transparent textures at the moment use alpha clipping. This will change in the future
 
 ## Setup
 1. Open `VMFImporterSettings` and add your VPK paths. Example: `D:\Program Files (x86)\Steam\steamapps\common\Source SDK Base 2013 Singleplayer\hl2\hl2_textures_dir.vpk`
 
-2. To replace a material with your own shader, add it to the `Material Override` dictionary. Remember the key is CASE SENSITIVE.
+2. To replace a material with your own shader, add it to the `Material Override` dictionary (the key is CASE SENSITIVE)
 
 3. To replace entities, add them to the `Entity Overrides` dictionary. Also CASE SENSITIVE.
 
-4. Layer Materials are special textures meant for runtime replacement. This was a Delivery & Beyond specific thing.
+4. Layer Materials are special textures meant for runtime replacement
 
 <img width="961" height="942" alt="{B3469AF6-D7B7-4C71-A4C1-8FA2D0C9FCA3}" src="https://github.com/user-attachments/assets/aca2ebb4-073f-4da5-be9d-a7c650f98c5f" />
