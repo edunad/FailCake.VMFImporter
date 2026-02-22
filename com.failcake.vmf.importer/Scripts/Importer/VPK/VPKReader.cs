@@ -11,7 +11,7 @@ using Object = UnityEngine.Object;
 
 namespace FailCake.VMF
 {
-    #if UNITY_EDITOR
+#if UNITY_EDITOR
     internal class VPKReader
     {
         private const uint VPK_SIGNATURE = 0x55AA1234;
@@ -31,11 +31,9 @@ namespace FailCake.VMF
         private uint _treeStart;
         private uint _fileDataStart;
 
-        private readonly Dictionary<string, EntryInfo> _fileEntries =
-            new Dictionary<string, EntryInfo>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, EntryInfo> _fileEntries = new(StringComparer.OrdinalIgnoreCase);
 
-        private readonly Dictionary<string, Texture2D> _textureCache =
-            new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Texture2D> _textureCache = new(StringComparer.OrdinalIgnoreCase);
 
         public class EntryInfo
         {
@@ -49,12 +47,14 @@ namespace FailCake.VMF
             public byte[] PreloadData;
             public uint CRC;
 
-            public string GetFullPath() {
-                return this.Path + "/" + this.Filename + "." + this.Extension;
+            public string GetFullPath()
+            {
+                return Path + "/" + Filename + "." + Extension;
             }
         }
 
-        public bool Open(string vpkPath) {
+        public bool Open(string vpkPath)
+        {
             if (string.IsNullOrEmpty(vpkPath))
             {
                 Debug.LogError("VPK path cannot be null or empty");
@@ -69,21 +69,22 @@ namespace FailCake.VMF
                     return false;
                 }
 
-                this._vpkPath = vpkPath;
+                _vpkPath = vpkPath;
 
-                string fileName = Path.GetFileNameWithoutExtension(vpkPath);
-                this._vpkBaseName = fileName.EndsWith("_dir", StringComparison.OrdinalIgnoreCase)
+                var fileName = Path.GetFileNameWithoutExtension(vpkPath);
+                _vpkBaseName = fileName.EndsWith("_dir", StringComparison.OrdinalIgnoreCase)
                     ? fileName.Substring(0, fileName.Length - 4)
                     : fileName;
 
-                using (FileStream stream = new FileStream(vpkPath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.SequentialScan))
+                using (var stream = new FileStream(vpkPath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192,
+                           FileOptions.SequentialScan))
                 {
-                    using (BinaryReader reader = new BinaryReader(stream))
+                    using (var reader = new BinaryReader(stream))
                     {
-                        if (!this.ReadVPKHeader(reader)) return false;
-                        stream.Position = this._treeStart;
+                        if (!ReadVPKHeader(reader)) return false;
+                        stream.Position = _treeStart;
 
-                        this.ReadDirectoryTree(reader);
+                        ReadDirectoryTree(reader);
                     }
                 }
 
@@ -96,40 +97,41 @@ namespace FailCake.VMF
             }
         }
 
-        private bool ReadVPKHeader(BinaryReader reader) {
+        private bool ReadVPKHeader(BinaryReader reader)
+        {
             try
             {
-                uint signature = reader.ReadUInt32();
-                if (signature != VPKReader.VPK_SIGNATURE)
+                var signature = reader.ReadUInt32();
+                if (signature != VPK_SIGNATURE)
                 {
-                    Debug.LogError($"Invalid VPK signature: 0x{signature:X8}, expected 0x{VPKReader.VPK_SIGNATURE:X8}");
+                    Debug.LogError($"Invalid VPK signature: 0x{signature:X8}, expected 0x{VPK_SIGNATURE:X8}");
                     return false;
                 }
 
-                this._version = reader.ReadUInt32();
-                this._treeSize = reader.ReadUInt32();
+                _version = reader.ReadUInt32();
+                _treeSize = reader.ReadUInt32();
 
-                if (this._treeSize == 0)
+                if (_treeSize == 0)
                 {
                     Debug.LogError("VPK has zero tree size - invalid file");
                     return false;
                 }
 
-                this._treeStart = 12; // V1 header size
+                _treeStart = 12; // V1 header size
 
-                if (this._version == VPKReader.VPK_VERSION2)
+                if (_version == VPK_VERSION2)
                 {
-                    this._fileDataSectionSize = reader.ReadUInt32();
-                    this._archiveMD5SectionSize = reader.ReadUInt32();
-                    this._otherMD5SectionSize = reader.ReadUInt32();
-                    this._signatureSectionSize = reader.ReadUInt32();
+                    _fileDataSectionSize = reader.ReadUInt32();
+                    _archiveMD5SectionSize = reader.ReadUInt32();
+                    _otherMD5SectionSize = reader.ReadUInt32();
+                    _signatureSectionSize = reader.ReadUInt32();
 
-                    this._treeStart = 28; // V2 header size
-                    this._fileDataStart = this._treeStart + this._treeSize;
+                    _treeStart = 28; // V2 header size
+                    _fileDataStart = _treeStart + _treeSize;
                 }
-                else if (this._version != VPKReader.VPK_VERSION1)
+                else if (_version != VPK_VERSION1)
                 {
-                    Debug.LogError($"Unsupported VPK version: {this._version}");
+                    Debug.LogError($"Unsupported VPK version: {_version}");
                     return false;
                 }
 
@@ -142,90 +144,95 @@ namespace FailCake.VMF
             }
         }
 
-        public EntryInfo GetFile(string filePath) {
+        public EntryInfo GetFile(string filePath)
+        {
             if (string.IsNullOrEmpty(filePath)) return null;
             filePath = filePath.ToLowerInvariant().Replace('\\', '/').TrimStart('/');
 
-            if (this._fileEntries.TryGetValue(filePath, out EntryInfo directMatch)) return directMatch; // CACHE
-            return this.FindFileWithFallbacks(filePath);
+            if (_fileEntries.TryGetValue(filePath, out var directMatch)) return directMatch; // CACHE
+            return FindFileWithFallbacks(filePath);
         }
 
-        private EntryInfo FindFileWithFallbacks(string normalizedPath) {
+        private EntryInfo FindFileWithFallbacks(string normalizedPath)
+        {
             if (!normalizedPath.EndsWith(".vtf", StringComparison.Ordinal))
             {
-                string vtfPath = normalizedPath + ".vtf";
-                if (this._fileEntries.TryGetValue(vtfPath, out EntryInfo vtfMatch)) return vtfMatch;
+                var vtfPath = normalizedPath + ".vtf";
+                if (_fileEntries.TryGetValue(vtfPath, out var vtfMatch)) return vtfMatch;
             }
 
             if (!normalizedPath.StartsWith("materials/", StringComparison.Ordinal))
             {
-                string materialsPath = "materials/" + normalizedPath;
-                if (this._fileEntries.TryGetValue(materialsPath, out EntryInfo materialsMatch)) return materialsMatch;
+                var materialsPath = "materials/" + normalizedPath;
+                if (_fileEntries.TryGetValue(materialsPath, out var materialsMatch)) return materialsMatch;
 
                 if (!materialsPath.EndsWith(".vtf", StringComparison.Ordinal))
                 {
-                    string materialsVtfPath = materialsPath + ".vtf";
-                    if (this._fileEntries.TryGetValue(materialsVtfPath, out EntryInfo materialsVtfMatch)) return materialsVtfMatch;
+                    var materialsVtfPath = materialsPath + ".vtf";
+                    if (_fileEntries.TryGetValue(materialsVtfPath, out var materialsVtfMatch)) return materialsVtfMatch;
                 }
             }
 
             return null;
         }
 
-        public Texture2D LoadTexture(EntryInfo entry) {
-            if (entry == null) return this.GetErrorTexture();
+        public Texture2D LoadTexture(EntryInfo entry)
+        {
+            if (entry == null) return GetErrorTexture();
 
-            string path = entry.GetFullPath();
-            if (this._textureCache.TryGetValue(path, out Texture2D cachedTexture))
+            var path = entry.GetFullPath();
+            if (_textureCache.TryGetValue(path, out var cachedTexture))
             {
                 if (cachedTexture) return cachedTexture;
-                this._textureCache.Remove(path);
+                _textureCache.Remove(path);
             }
 
             try
             {
-                byte[] fileData = this.ExtractFile(path);
-                if (fileData?.Length == 0)
+                var fileData = ExtractFile(path);
+                if (fileData is not { Length: > 0 })
                 {
                     Debug.LogError($"VTF file is empty or could not be extracted: {path}");
-                    return this.GetErrorTexture();
+                    return GetErrorTexture();
                 }
 
-                Texture2D texture = this.LoadVTFTexture(path, fileData);
+                var texture = LoadVTFTexture(path, fileData);
                 if (!texture)
                 {
                     Debug.LogError($"Failed to parse VTF texture: {path}");
-                    return this.GetErrorTexture();
+                    return GetErrorTexture();
                 }
 
                 texture.filterMode = FilterMode.Point;
                 texture.wrapMode = TextureWrapMode.Repeat;
 
-                this._textureCache[path] = texture;
+                _textureCache[path] = texture;
                 return texture;
             }
             catch (Exception ex)
             {
                 Debug.LogError($"Error loading VTF texture '{path}': {ex.Message}");
-                return this.GetErrorTexture();
+                return GetErrorTexture();
             }
         }
 
-        public Texture2D LoadTexture(string texturePath) {
-            if (string.IsNullOrEmpty(texturePath)) return this.GetErrorTexture();
+        public Texture2D LoadTexture(string texturePath)
+        {
+            if (string.IsNullOrEmpty(texturePath)) return GetErrorTexture();
 
-            EntryInfo entry = this.GetFile(texturePath);
-            if (entry != null) return this.LoadTexture(entry);
+            var entry = GetFile(texturePath);
+            if (entry != null) return LoadTexture(entry);
 
             Debug.LogError($"VTF texture not found in VPK: '{texturePath}'");
-            return this.GetErrorTexture();
+            return GetErrorTexture();
         }
 
-        private byte[] ExtractFile(string filePath) {
+        private byte[] ExtractFile(string filePath)
+        {
             if (string.IsNullOrEmpty(filePath)) return null;
 
-            string normalizedPath = filePath.ToLowerInvariant();
-            if (!this._fileEntries.TryGetValue(normalizedPath, out EntryInfo entry))
+            var normalizedPath = filePath.ToLowerInvariant();
+            if (!_fileEntries.TryGetValue(normalizedPath, out var entry))
             {
                 Debug.LogWarning($"File not found in VPK directory: {filePath}");
                 return null;
@@ -235,17 +242,17 @@ namespace FailCake.VMF
             {
                 if (entry.PreloadData != null && entry.EntryLength == 0) return entry.PreloadData;
 
-                string archivePath = this.GetArchivePath(entry);
+                var archivePath = GetArchivePath(entry);
                 if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
                 {
                     Debug.LogError($"VPK archive not found: {archivePath}");
                     return null;
                 }
 
-                byte[] mainData = this.ReadFileFromArchive(archivePath, entry);
+                var mainData = ReadFileFromArchive(archivePath, entry);
                 if (mainData == null) return null;
 
-                return this.CombineFileData(entry.PreloadData, mainData);
+                return CombineFileData(entry.PreloadData, mainData);
             }
             catch (Exception ex)
             {
@@ -254,31 +261,35 @@ namespace FailCake.VMF
             }
         }
 
-        private string GetArchivePath(EntryInfo entry) {
-            if (entry.ArchiveIndex == 0x7FFF) return this._vpkPath;
+        private string GetArchivePath(EntryInfo entry)
+        {
+            if (entry.ArchiveIndex == 0x7FFF) return _vpkPath;
 
-            string directory = Path.GetDirectoryName(this._vpkPath);
+            var directory = Path.GetDirectoryName(_vpkPath);
             if (string.IsNullOrEmpty(directory)) directory = Environment.CurrentDirectory;
 
-            return Path.Combine(directory, $"{this._vpkBaseName}_{entry.ArchiveIndex:D3}.vpk");
+            return Path.Combine(directory, $"{_vpkBaseName}_{entry.ArchiveIndex:D3}.vpk");
         }
 
-        private byte[] ReadFileFromArchive(string archivePath, EntryInfo entry) {
+        private byte[] ReadFileFromArchive(string archivePath, EntryInfo entry)
+        {
             try
             {
-                using (FileStream stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192))
+                using (var stream = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192))
                 {
-                    uint filePosition = entry.EntryOffset;
-                    if (entry.ArchiveIndex == 0x7FFF && this._version == VPKReader.VPK_VERSION2) filePosition = this._fileDataStart + entry.EntryOffset;
+                    var filePosition = entry.EntryOffset;
+                    if (entry.ArchiveIndex == 0x7FFF && _version == VPK_VERSION2)
+                        filePosition = _fileDataStart + entry.EntryOffset;
 
                     if (filePosition >= stream.Length)
                     {
-                        Debug.LogError($"Invalid file offset {filePosition} in archive {archivePath} (length: {stream.Length})");
+                        Debug.LogError(
+                            $"Invalid file offset {filePosition} in archive {archivePath} (length: {stream.Length})");
                         return null;
                     }
 
                     stream.Position = filePosition;
-                    return this.ReadFileData(stream, entry.EntryLength);
+                    return ReadFileData(stream, entry.EntryLength);
                 }
             }
             catch (Exception ex)
@@ -288,19 +299,21 @@ namespace FailCake.VMF
             }
         }
 
-        private byte[] ReadFileData(Stream stream, uint expectedLength) {
+        private byte[] ReadFileData(Stream stream, uint expectedLength)
+        {
             if (expectedLength == 0) return Array.Empty<byte>();
 
-            byte[] fileData = new byte[expectedLength];
-            int totalBytesRead = 0;
-            int remaining = (int)expectedLength;
+            var fileData = new byte[expectedLength];
+            var totalBytesRead = 0;
+            var remaining = (int)expectedLength;
 
             while (remaining > 0)
             {
-                int bytesRead = stream.Read(fileData, totalBytesRead, remaining);
+                var bytesRead = stream.Read(fileData, totalBytesRead, remaining);
                 if (bytesRead <= 0)
                 {
-                    Debug.LogWarning($"Unexpected end of stream. Expected {expectedLength} bytes, got {totalBytesRead}");
+                    Debug.LogWarning(
+                        $"Unexpected end of stream. Expected {expectedLength} bytes, got {totalBytesRead}");
                     break;
                 }
 
@@ -312,7 +325,7 @@ namespace FailCake.VMF
             {
                 Debug.LogWarning($"Incomplete file read: expected {expectedLength} bytes, got {totalBytesRead}");
 
-                byte[] partialData = new byte[totalBytesRead];
+                var partialData = new byte[totalBytesRead];
                 Buffer.BlockCopy(fileData, 0, partialData, 0, totalBytesRead);
                 return partialData;
             }
@@ -320,10 +333,11 @@ namespace FailCake.VMF
             return fileData;
         }
 
-        private byte[] CombineFileData(byte[] preloadData, byte[] mainData) {
+        private byte[] CombineFileData(byte[] preloadData, byte[] mainData)
+        {
             if (preloadData?.Length > 0)
             {
-                byte[] combinedData = new byte[preloadData.Length + mainData.Length];
+                var combinedData = new byte[preloadData.Length + mainData.Length];
                 Buffer.BlockCopy(preloadData, 0, combinedData, 0, preloadData.Length);
                 Buffer.BlockCopy(mainData, 0, combinedData, preloadData.Length, mainData.Length);
                 return combinedData;
@@ -332,99 +346,122 @@ namespace FailCake.VMF
             return mainData;
         }
 
-        private Texture2D LoadVTFTexture(string path, byte[] data) {
-            using (MemoryStream ms = new MemoryStream(data))
+        private Texture2D LoadVTFTexture(string path, byte[] data)
+        {
+            using (var ms = new MemoryStream(data))
             {
-                using (BinaryReader reader = new BinaryReader(ms))
+                using (var reader = new BinaryReader(ms))
                 {
                     try
                     {
                         // SIGNATURE
-                        byte[] signature = reader.ReadBytes(4);
+                        var signature = reader.ReadBytes(4);
                         if (signature[0] != 'V' || signature[1] != 'T' || signature[2] != 'F' || signature[3] != 0)
                         {
                             Debug.LogError($"Invalid VTF signature for {path}");
-                            return this.GetErrorTexture();
+                            return GetErrorTexture();
                         }
 
                         // VERSION
-                        uint majorValue = reader.ReadUInt32();
-                        uint minorValue = reader.ReadUInt32();
-                        float majorVersion = majorValue / 10.0f;
-                        float minorVersion = minorValue / 10.0f;
+                        var majorVersion = reader.ReadUInt32();
+                        var minorVersion = reader.ReadUInt32();
 
                         // HEADER
-                        uint headerSize = reader.ReadUInt32();
+                        var headerSize = reader.ReadUInt32();
 
                         // DIMENSIONS
-                        ushort width = reader.ReadUInt16();
-                        ushort height = reader.ReadUInt16();
+                        var width = reader.ReadUInt16();
+                        var height = reader.ReadUInt16();
 
                         if (width == 0 || height == 0 || width > 8192 || height > 8192)
                         {
                             Debug.LogError($"Invalid VTF size for {path}");
-                            return this.GetErrorTexture();
+                            return GetErrorTexture();
                         }
 
                         // FLAGS
-                        uint flags = reader.ReadUInt32();
-                        bool hasAlpha = (flags & 0x2) != 0;
+                        var flags = reader.ReadUInt32();
+                        var hasAlpha = (flags & 0x2) != 0;
 
                         // FRAMES
-                        ushort frames = reader.ReadUInt16();
-                        ushort firstFrame = reader.ReadUInt16();
+                        var frames = reader.ReadUInt16();
+                        var firstFrame = reader.ReadUInt16();
 
                         reader.BaseStream.Position += 4;
                         reader.BaseStream.Position += 12; // 3 floats (12 bytes)
                         reader.BaseStream.Position += 4;
 
                         // BUMPSCALE
-                        float bumpScale = reader.ReadSingle();
+                        var bumpScale = reader.ReadSingle();
 
                         // IMAGE FORMAT
-                        uint imageFormat = reader.ReadUInt32();
+                        var imageFormat = reader.ReadUInt32();
 
                         // MIPMAP COUNT
-                        byte mipmapCount = reader.ReadByte();
+                        var mipmapCount = reader.ReadByte();
                         if (mipmapCount == 0) mipmapCount = 1; // Ensure at least one mip level
 
-                        uint lowResImageFormat = reader.ReadUInt32();
-                        byte lowResImageWidth = reader.ReadByte();
-                        byte lowResImageHeight = reader.ReadByte();
+                        var lowResImageFormat = reader.ReadUInt32();
+                        var lowResImageWidth = reader.ReadByte();
+                        var lowResImageHeight = reader.ReadByte();
 
                         ushort depth = 1;
                         if (majorVersion >= 7 && minorVersion >= 2) depth = reader.ReadUInt16();
 
-                        // VTF 7.3+
+                        var lowResImageSize = GetImageSize(lowResImageFormat, lowResImageWidth, lowResImageHeight);
                         if (majorVersion >= 7 && minorVersion >= 3)
                         {
-                            ms.Position = 80;
-                            uint numResources = reader.ReadUInt32();
-                            ms.Position = headerSize;
+                            ms.Position = 68;
+                            var numResources = reader.ReadUInt32();
+                            // Each entry: 3 bytes tag + 1 byte flags + 4 bytes offset = 8 bytes
+                            // Resource entries start at byte 80
+                            long resourceDirPos = 80;
+
+                            uint highResOffset = 0;
+                            for (uint r = 0; r < numResources && r < 32; r++)
+                            {
+                                ms.Position = resourceDirPos + r * 8;
+                                var tag0 = reader.ReadByte();
+                                var tag1 = reader.ReadByte();
+                                var tag2 = reader.ReadByte();
+                                var resFlags = reader.ReadByte();
+                                var offset = reader.ReadUInt32();
+
+                                // 0x30 = high-res image data
+                                if (tag0 == 0x30 && tag1 == 0x00 && tag2 == 0x00)
+                                {
+                                    highResOffset = offset;
+                                    break;
+                                }
+                            }
+
+                            ms.Position = highResOffset > 0
+                                ? highResOffset
+                                : headerSize + lowResImageSize; // Fallback
                         }
                         else
                         {
-                            int lowResImageSize =
-                                this.GetImageSize(lowResImageFormat, lowResImageWidth, lowResImageHeight);
                             ms.Position = headerSize + lowResImageSize;
                         }
 
-                        TextureFormat unityFormat = this.GetUnityTextureFormat(imageFormat, hasAlpha);
-                        if (unityFormat == TextureFormat.RGBA32 && !this.IsFormatSupported(imageFormat))
+                        var unityFormat = GetUnityTextureFormat(imageFormat, hasAlpha);
+                        if (unityFormat == TextureFormat.RGBA32 && !IsFormatSupported(imageFormat))
                         {
                             Debug.LogWarning($"Unsupported VTF format: {imageFormat}, using fallback");
-                            return this.GetErrorTexture();
+                            return GetErrorTexture();
                         }
 
                         // DXT
                         if (unityFormat == TextureFormat.DXT1 || unityFormat == TextureFormat.DXT5)
                             if (width % 4 != 0 || height % 4 != 0)
                             {
-                                Debug.LogError($"VTF DXT texture '{Path.GetFileName(path)}' has dimensions ({width}x{height}) which are not a multiple of 4. Unity requires DXT textures to have dimensions that are multiples of 4. Skipping texture.");
-                                return this.GetErrorTexture();
+                                Debug.LogError(
+                                    $"VTF DXT texture '{Path.GetFileName(path)}' has dimensions ({width}x{height}) which are not a multiple of 4. Unity requires DXT textures to have dimensions that are multiples of 4. Skipping texture.");
+                                return GetErrorTexture();
                             }
 
-                        Texture2D texture = new Texture2D(width, height, unityFormat, mipmapCount > 1) {
+                        var texture = new Texture2D(width, height, unityFormat, mipmapCount > 1)
+                        {
                             name = Path.GetFileName(path),
                             alphaIsTransparency = hasAlpha
                         };
@@ -432,26 +469,50 @@ namespace FailCake.VMF
                         byte[] imageData;
                         if (unityFormat is TextureFormat.DXT1 or TextureFormat.DXT5)
                         {
-                            int totalSize = 0;
-                            for (int i = 0; i < mipmapCount; i++)
+                            // VTF stores mipmaps from smallest to largest
+                            // Unity expects largest to smallest, so we must reverse the order
+                            var mipSizes = new int[mipmapCount];
+                            var totalSize = 0;
+                            for (var i = 0; i < mipmapCount; i++)
                             {
-                                int mipWidth = Math.Max(1, width >> i);
-                                int mipHeight = Math.Max(1, height >> i);
-                                totalSize += this.GetMipMapSize(imageFormat, mipWidth, mipHeight);
+                                var mipWidth = Math.Max(1, width >> i);
+                                var mipHeight = Math.Max(1, height >> i);
+                                mipSizes[i] = GetMipMapSize(imageFormat, mipWidth, mipHeight);
+                                totalSize += mipSizes[i];
                             }
 
-                            imageData = reader.ReadBytes(totalSize);
+                            var rawMipData = reader.ReadBytes(totalSize);
+
+                            if (mipmapCount > 1)
+                            {
+                                // Reverse mip order: VTF is smallest-first, Unity needs largest-first
+                                imageData = new byte[totalSize];
+                                var srcOffset = totalSize; // Start from end (largest mip in VTF)
+                                var dstOffset = 0;
+
+                                for (var i = 0; i < mipmapCount; i++)
+                                {
+                                    srcOffset -= mipSizes[i];
+                                    Buffer.BlockCopy(rawMipData, srcOffset, imageData, dstOffset, mipSizes[i]);
+                                    dstOffset += mipSizes[i];
+                                }
+                            }
+                            else
+                            {
+                                imageData = rawMipData;
+                            }
+
                             texture.LoadRawTextureData(imageData);
                         }
                         else
                         {
-                            int dataSize = width * height * 4; // RGBA32 = 4 bytes per pixel
+                            var dataSize = width * height * 4; // RGBA32 = 4 bytes per pixel
                             imageData = new byte[dataSize];
 
-                            int mipSize = this.GetMipMapSize(imageFormat, width, height);
-                            byte[] mipData = reader.ReadBytes(mipSize);
+                            var mipSize = GetMipMapSize(imageFormat, width, height);
+                            var mipData = reader.ReadBytes(mipSize);
 
-                            this.ConvertToRGBA(mipData, imageData, imageFormat, width, height, hasAlpha);
+                            ConvertToRGBA(mipData, imageData, imageFormat, width, height, hasAlpha);
                             texture.SetPixelData(imageData, 0);
                         }
 
@@ -461,62 +522,65 @@ namespace FailCake.VMF
                     catch (Exception ex)
                     {
                         Debug.LogError($"Error parsing VTF texture: {ex.Message}");
-                        return this.GetErrorTexture();
+                        return GetErrorTexture();
                     }
                 }
             }
         }
 
-        public void Close() {
-            foreach (Texture2D texture in this._textureCache.Values)
+        public void Close()
+        {
+            foreach (var texture in _textureCache.Values)
                 if (texture)
                     Object.DestroyImmediate(texture);
 
-            this._textureCache.Clear();
-            this._fileEntries.Clear();
+            _textureCache.Clear();
+            _fileEntries.Clear();
 
-            Debug.Log($"Closed VPK: {this._vpkPath}");
+            Debug.Log($"Closed VPK: {_vpkPath}");
         }
 
         #region PRIVATE
 
-        private void ReadDirectoryTree(BinaryReader reader) {
-            this._fileEntries.Clear();
+        private void ReadDirectoryTree(BinaryReader reader)
+        {
+            _fileEntries.Clear();
 
             try
             {
-                StringBuilder pathBuilder = new StringBuilder(512);
+                var pathBuilder = new StringBuilder(512);
                 // extension -> directory -> filename
                 while (true)
                 {
-                    string extension = this.ReadNullTerminatedString(reader);
+                    var extension = ReadNullTerminatedString(reader);
                     if (string.IsNullOrEmpty(extension)) break; // End of extensions
 
-                    bool isVTF = extension.Equals("vtf", StringComparison.OrdinalIgnoreCase);
+                    var isVTF = extension.Equals("vtf", StringComparison.OrdinalIgnoreCase);
                     while (true)
                     {
-                        string directoryPath = this.ReadNullTerminatedString(reader);
+                        var directoryPath = ReadNullTerminatedString(reader);
                         if (string.IsNullOrEmpty(directoryPath)) break;
 
                         while (true)
                         {
-                            string filename = this.ReadNullTerminatedString(reader);
+                            var filename = ReadNullTerminatedString(reader);
                             if (string.IsNullOrEmpty(filename)) break;
 
                             try
                             {
-                                EntryInfo entry = this.ReadFileEntry(reader, extension, directoryPath, filename);
+                                var entry = ReadFileEntry(reader, extension, directoryPath, filename);
                                 if (entry == null) continue;
 
                                 if (isVTF)
                                 {
-                                    string filePath = this.BuildFilePath(pathBuilder, directoryPath, filename, extension);
-                                    this._fileEntries[filePath] = entry;
+                                    var filePath = BuildFilePath(pathBuilder, directoryPath, filename, extension);
+                                    _fileEntries[filePath] = entry;
                                 }
                             }
                             catch (Exception ex)
                             {
-                                Debug.LogError($"Error reading file entry '{filename}' in '{directoryPath}': {ex.Message}");
+                                Debug.LogError(
+                                    $"Error reading file entry '{filename}' in '{directoryPath}': {ex.Message}");
                             }
                         }
                     }
@@ -529,30 +593,35 @@ namespace FailCake.VMF
             }
         }
 
-        private EntryInfo ReadFileEntry(BinaryReader reader, string extension, string directoryPath, string filename) {
+        private EntryInfo ReadFileEntry(BinaryReader reader, string extension, string directoryPath, string filename)
+        {
             try
             {
-                EntryInfo entry = new EntryInfo {
+                var entry = new EntryInfo
+                {
                     Extension = extension,
                     Path = directoryPath,
                     Filename = filename,
                     CRC = reader.ReadUInt32()
                 };
 
-                ushort preloadBytes = reader.ReadUInt16();
+                var preloadBytes = reader.ReadUInt16();
                 entry.ArchiveIndex = reader.ReadUInt16();
                 entry.EntryOffset = reader.ReadUInt32();
                 entry.EntryLength = reader.ReadUInt32();
 
-                ushort terminator = reader.ReadUInt16();
-                if (terminator != VPKReader.TERMINATOR) Debug.LogWarning($"Unexpected terminator value: 0x{terminator:X4} (expected 0x{VPKReader.TERMINATOR:X4})");
+                var terminator = reader.ReadUInt16();
+                if (terminator != TERMINATOR)
+                    Debug.LogWarning($"Unexpected terminator value: 0x{terminator:X4} (expected 0x{TERMINATOR:X4})");
 
                 if (preloadBytes > 0)
                 {
                     entry.Preload = preloadBytes;
                     entry.PreloadData = reader.ReadBytes(preloadBytes);
 
-                    if (entry.PreloadData.Length != preloadBytes) Debug.LogWarning($"Incomplete preload data read for '{filename}': expected {preloadBytes}, got {entry.PreloadData.Length}");
+                    if (entry.PreloadData.Length != preloadBytes)
+                        Debug.LogWarning(
+                            $"Incomplete preload data read for '{filename}': expected {preloadBytes}, got {entry.PreloadData.Length}");
                 }
 
                 return entry;
@@ -564,7 +633,8 @@ namespace FailCake.VMF
             }
         }
 
-        private string BuildFilePath(StringBuilder builder, string directory, string filename, string extension) {
+        private string BuildFilePath(StringBuilder builder, string directory, string filename, string extension)
+        {
             builder.Clear();
 
             if (!string.IsNullOrEmpty(directory) && directory.Trim() != "")
@@ -582,10 +652,11 @@ namespace FailCake.VMF
             return builder.ToString();
         }
 
-        private string ReadNullTerminatedString(BinaryReader reader) {
+        private string ReadNullTerminatedString(BinaryReader reader)
+        {
             try
             {
-                List<byte> bytes = new List<byte>(64);
+                var bytes = new List<byte>(64);
 
                 byte b;
                 while ((b = reader.ReadByte()) != 0)
@@ -606,7 +677,8 @@ namespace FailCake.VMF
             }
         }
 
-        private bool IsFormatSupported(uint format) {
+        private bool IsFormatSupported(uint format)
+        {
             switch (format)
             {
                 case 0: // RGBA8888
@@ -624,8 +696,9 @@ namespace FailCake.VMF
         }
 
         // Convert to RGBA format for Unity
-        private void ConvertToRGBA(byte[] source, byte[] dest, uint format, int width, int height, bool hasAlpha) {
-            int pixelCount = width * height;
+        private void ConvertToRGBA(byte[] source, byte[] dest, uint format, int width, int height, bool hasAlpha)
+        {
+            var pixelCount = width * height;
 
             switch (format)
             {
@@ -634,10 +707,10 @@ namespace FailCake.VMF
                     break;
 
                 case 2: // ABGR8888
-                    for (int i = 0; i < pixelCount; i++)
+                    for (var i = 0; i < pixelCount; i++)
                     {
-                        int srcIdx = i * 4;
-                        int dstIdx = i * 4;
+                        var srcIdx = i * 4;
+                        var dstIdx = i * 4;
 
                         if (srcIdx + 3 < source.Length && dstIdx + 3 < dest.Length)
                         {
@@ -651,10 +724,10 @@ namespace FailCake.VMF
                     break;
 
                 case 12: // BGRA8888
-                    for (int i = 0; i < pixelCount; i++)
+                    for (var i = 0; i < pixelCount; i++)
                     {
-                        int srcIdx = i * 4;
-                        int dstIdx = i * 4;
+                        var srcIdx = i * 4;
+                        var dstIdx = i * 4;
 
                         if (srcIdx + 3 < source.Length && dstIdx + 3 < dest.Length)
                         {
@@ -669,11 +742,11 @@ namespace FailCake.VMF
 
                 case 3: // RGB888
                 case 4: // BGR888
-                    bool isBGR = format == 4;
-                    for (int i = 0; i < pixelCount; i++)
+                    var isBGR = format == 4;
+                    for (var i = 0; i < pixelCount; i++)
                     {
-                        int srcIdx = i * 3;
-                        int dstIdx = i * 4;
+                        var srcIdx = i * 3;
+                        var dstIdx = i * 4;
 
                         if (srcIdx + 2 < source.Length && dstIdx + 3 < dest.Length)
                         {
@@ -698,9 +771,9 @@ namespace FailCake.VMF
 
                 default:
                     // Fill with magenta for unsupported formats
-                    for (int i = 0; i < pixelCount; i++)
+                    for (var i = 0; i < pixelCount; i++)
                     {
-                        int dstIdx = i * 4;
+                        var dstIdx = i * 4;
                         if (dstIdx + 3 < dest.Length)
                         {
                             dest[dstIdx] = 255; // R
@@ -714,7 +787,8 @@ namespace FailCake.VMF
             }
         }
 
-        private int GetImageSize(uint format, int width, int height) {
+        private int GetImageSize(uint format, int width, int height)
+        {
             switch (format)
             {
                 case 13: // DXT1
@@ -734,7 +808,8 @@ namespace FailCake.VMF
             }
         }
 
-        private TextureFormat GetUnityTextureFormat(uint vtfFormat, bool hasAlpha) {
+        private TextureFormat GetUnityTextureFormat(uint vtfFormat, bool hasAlpha)
+        {
             switch (vtfFormat)
             {
                 case 0: // RGBA8888
@@ -753,39 +828,41 @@ namespace FailCake.VMF
             }
         }
 
-        private int GetMipMapSize(uint format, int width, int height) {
-            return this.GetImageSize(format, width, height);
+        private int GetMipMapSize(uint format, int width, int height)
+        {
+            return GetImageSize(format, width, height);
         }
 
         #region ERROR TEXTURE
 
-        private Texture2D GetErrorTexture() {
-            if (this._textureCache.TryGetValue("__ERROR__", out Texture2D value)) return value;
+        private Texture2D GetErrorTexture()
+        {
+            if (_textureCache.TryGetValue("__ERROR__", out var value)) return value;
 
-            Texture2D texture = VPKReader.CreateErrorTexture();
-            this._textureCache["__ERROR__"] = texture;
+            var texture = CreateErrorTexture();
+            _textureCache["__ERROR__"] = texture;
 
             return texture;
         }
 
-        public static Texture2D CreateErrorTexture() {
+        public static Texture2D CreateErrorTexture()
+        {
             const int SIZE = 32;
 
-            Texture2D texture = new Texture2D(SIZE, SIZE, TextureFormat.RGB24, false) {
+            var texture = new Texture2D(SIZE, SIZE, TextureFormat.RGB24, false)
+            {
                 name = "INVALID-TEXTURE"
             };
 
-            Color32[] colors = new Color32[SIZE * SIZE];
-            Color32 color1 = new Color32(200, 0, 200, 255);
-            Color32 color2 = new Color32(1, 1, 1, 255);
+            var colors = new Color32[SIZE * SIZE];
+            var color1 = new Color32(200, 0, 200, 255);
+            var color2 = new Color32(1, 1, 1, 255);
 
-            for (int y = 0; y < SIZE; y++)
+            for (var y = 0; y < SIZE; y++)
+            for (var x = 0; x < SIZE; x++)
             {
-                for (int x = 0; x < SIZE; x++)
-                {
-                    bool isCheckerboard = (x / 8 + y / 8) % 2 == 0;
-                    colors[y * SIZE + x] = isCheckerboard ? color1 : color2;
-                }
+                var isCheckerboard = (x / 8 + y / 8) % 2 == 0;
+                colors[y * SIZE + x] = isCheckerboard ? color1 : color2;
             }
 
             texture.alphaIsTransparency = false;
@@ -802,10 +879,10 @@ namespace FailCake.VMF
         #endregion
     }
 
-    #endif
+#endif
 }
 
-/*# MIT License Copyright (c) 2025 FailCake
+/*# MIT License Copyright (c) 2026 FailCake
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish,

@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System.Collections.Generic;
 using UnityEngine;
@@ -29,7 +29,7 @@ namespace FailCake.VMF
 
         public static Mesh GenerateMesh(AssetImportContext ctx, Dictionary<string, List<VMFSide>> materialGroups, ref List<Material> generatedMaterials, VMFMaterials vmfMaterials = null)
         {
-            if (materialGroups?.Count == 0)
+            if (materialGroups is not { Count: > 0 })
             {
                 Debug.LogWarning("No material groups provided for mesh generation");
                 return null;
@@ -46,7 +46,7 @@ namespace FailCake.VMF
                 if (generatedMaterials != null && materialBatches?.Count > 0)
                 {
                     textureArrayMappings = VMFTextures.CreateTextureArrays(ctx, materialBatches, ref generatedMaterials, vmfMaterials);
-                    if (textureArrayMappings?.Count == 0)
+                    if (textureArrayMappings is not { Count: > 0 })
                     {
                         Debug.LogWarning("No texture arrays created, proceeding without textures");
                         // Continue without textures rather than failing completely
@@ -65,7 +65,7 @@ namespace FailCake.VMF
 
         public static Mesh GenerateMeshWithSharedTextures(Dictionary<string, List<VMFSide>> materialGroups, Dictionary<string, TextureArrayInfo> sharedTextureArrays)
         {
-            if (materialGroups?.Count == 0)
+            if (materialGroups is not { Count: > 0 })
             {
                 Debug.LogWarning("No material groups provided for mesh generation with shared textures");
                 return null;
@@ -84,7 +84,7 @@ namespace FailCake.VMF
 
         private static Mesh GenerateMeshWithTextureArrays(Dictionary<string, List<VMFSide>> materialGroups, Dictionary<string, TextureArrayInfo> textureArrayMappings)
         {
-            if (materialGroups?.Count == 0)
+            if (materialGroups is not { Count: > 0 })
             {
                 Debug.LogWarning("No material groups provided for mesh generation");
                 return null;
@@ -156,7 +156,7 @@ namespace FailCake.VMF
             foreach (int materialIndex in materialIndices)
             {
                 List<VMFSide> sides = submeshGroups[materialIndex];
-                if (sides?.Count == 0)
+                if (sides is not { Count: > 0 })
                 {
                     Debug.LogWarning($"No sides found for material index: {materialIndex}");
                     continue;
@@ -216,7 +216,7 @@ namespace FailCake.VMF
 
         private static Mesh CreateSubmeshWithTextureIndices(List<VMFSide> sides)
         {
-            if (sides?.Count == 0)
+            if (sides is not { Count: > 0 })
             {
                 return null;
             }
@@ -296,7 +296,7 @@ namespace FailCake.VMF
     }
     #endif
 }
-/*# MIT License Copyright (c) 2025 FailCake
+/*# MIT License Copyright (c) 2026 FailCake
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish,

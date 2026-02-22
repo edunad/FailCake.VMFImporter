@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.Collections.Generic;
@@ -82,6 +82,10 @@ namespace FailCake.VMF
             return this._materialOverrides.GetValueOrDefault(key);
         }
 
+        public bool HasMaterialOverride(string key) {
+            return this._materialOverrides.TryGetValue(key, out Material mat) && mat;
+        }
+
         public GameObject GetEntityOverride(string key) {
             return this._entityOverrides.GetValueOrDefault(key);
         }
@@ -92,7 +96,7 @@ namespace FailCake.VMF
     }
 }
 
-/*# MIT License Copyright (c) 2025 FailCake
+/*# MIT License Copyright (c) 2026 FailCake
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish,

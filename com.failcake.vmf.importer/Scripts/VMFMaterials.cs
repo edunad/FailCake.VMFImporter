@@ -24,8 +24,7 @@ namespace FailCake.VMF
 
     public class VMFMaterials : MonoBehaviour
     {
-        // Maps array index -> texture index -> material type
-        public SerializedDictionary<byte, SerializedDictionary<byte, VMFMaterial>> materialDictionary =
+        // Maps array index -> texture index -> material type        public SerializedDictionary<byte, SerializedDictionary<byte, VMFMaterial>> materialDictionary =
             new SerializedDictionary<byte, SerializedDictionary<byte, VMFMaterial>>();
 
         #if UNITY_EDITOR

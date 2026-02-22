@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.Collections.Generic;
@@ -171,7 +171,9 @@ namespace FailCake.VMF
 
                     if (line == "{")
                     {
-                        stack.Add(new VMFDataBlock());
+                        VMFDataBlock anonymousBlock = new VMFDataBlock();
+                        stack[^1].Add(null, anonymousBlock);
+                        stack.Add(anonymousBlock);
                         continue;
                     }
 
@@ -264,7 +266,7 @@ namespace FailCake.VMF
     }
 }
 
-/*# MIT License Copyright (c) 2025 FailCake
+/*# MIT License Copyright (c) 2026 FailCake
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish,

@@ -1,4 +1,4 @@
-﻿#region
+#region
 
 using System;
 using System.Collections.Generic;
@@ -107,6 +107,10 @@ namespace FailCake.VMF
                 Debug.LogError($"Error importing VMF asset {ctx.assetPath}: {ex.Message}");
                 throw;
             }
+            finally
+            {
+                VMFTextures.Cleanup();
+            }
         }
 
         private void ProcessWorldSolids(AssetImportContext ctx, GameObject rootModel, List<VMFSolid> worldSolids, Dictionary<string, TextureArrayInfo> sharedTextureArrays, List<Material> sharedMaterials) {
@@ -174,7 +178,7 @@ namespace FailCake.VMF
         #region COLLISIONS
 
         private void ParseColliders(List<VMFSolid> solids, GameObject rootModel) {
-            if (!this.GenerateColliders || solids?.Count == 0) return;
+            if (!this.GenerateColliders || solids is not { Count: > 0 }) return;
 
             bool calculateMaterials = this.GenerateMaterialData && this.GenerateTextures;
 
@@ -183,15 +187,15 @@ namespace FailCake.VMF
             colliderRoot.isStatic = true;
 
             var colliderData = solids
-                .SelectMany(solid => new[] { (solid, bounds: this.GetBoundsForSolid(solid)) })
-                .Where(x => x.bounds.HasValue && this.IsBoundsValid(x.bounds.Value.bounds))
-                .Select(x => (x.bounds.Value.bounds, material: calculateMaterials ? this.GetDominantMaterial(x.solid) : "default"));
+                .Select(solid => (solid, bounds: this.GetBoundsForSolid(solid)))
+                .Where(x => x.bounds.HasValue && this.IsBoundsValid(x.bounds.Value))
+                .Select(x => (bounds: x.bounds.Value, material: calculateMaterials ? this.GetDominantMaterial(x.solid) : "default"));
 
             int colliderIndex = 0;
             foreach ((Bounds bounds, string material) data in colliderData) this.CreateColliderObject(data, colliderIndex++, colliderRoot);
         }
 
-        private (Bounds bounds, string material)? GetBoundsForSolid(VMFSolid solid) {
+        private Bounds? GetBoundsForSolid(VMFSolid solid) {
             if (solid?.sides == null || solid.sides.Count == 0) return null;
 
             var vertices = solid.sides
@@ -205,7 +209,7 @@ namespace FailCake.VMF
             Vector3 center = (min + max) * 0.5f;
             Vector3 size = max - min;
 
-            return (new Bounds(center, size), null);
+            return new Bounds(center, size);
         }
 
         private bool IsBoundsValid(Bounds bounds) {
@@ -250,7 +254,7 @@ namespace FailCake.VMF
             var filteredSides = solid.sides
                 .Where(side =>
                     !string.IsNullOrEmpty(side.material) &&
-                    (!VMFImporter.Settings.GetMaterialOverride(side.material) ||
+                    (!VMFImporter.Settings.HasMaterialOverride(side.material) ||
                      side.material.Contains("LAYER_TEXTURE", StringComparison.OrdinalIgnoreCase))
                 );
 
@@ -281,10 +285,6 @@ namespace FailCake.VMF
             foreach (VMFDataBlock entity in entities)
                 if (!this.TryCreateEntity(entity, entityOverrides, transformMatrix, rootModel)) { }
         }
-
-        #endregion
-
-        #region ENTITIES
 
         private bool TryCreateEntity(VMFDataBlock entity, Dictionary<string, GameObject> entityOverrides,
             Matrix4x4 transformMatrix, GameObject rootModel) {
@@ -454,8 +454,7 @@ namespace FailCake.VMF
             {
                 foreach (VMFSide side in solid.sides)
                 {
-                    string materialKey = side.material;
-                    if (!this.GenerateTextures) side.material = "__IGNORE__";
+                    string materialKey = this.GenerateTextures ? side.material : "__IGNORE__";
 
                     if (string.IsNullOrEmpty(materialKey)) continue;
                     if (!materialGroups.TryGetValue(materialKey, out List<VMFSide> sidesList))
@@ -545,7 +544,7 @@ namespace FailCake.VMF
     #endif
 }
 
-/*# MIT License Copyright (c) 2025 FailCake
+/*# MIT License Copyright (c) 2026 FailCake
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the
 # "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish,
