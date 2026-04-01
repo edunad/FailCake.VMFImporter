@@ -27,6 +27,8 @@ namespace FailCake.VMF
 
         public bool GenerateEntities = true;
 
+        public bool GenerateUVLightmap;
+
         public bool GenerateColliders;
 
         public bool IsReadable = true;
@@ -403,6 +405,8 @@ namespace FailCake.VMF
 
                 Mesh finalMesh = this.SimplifyMesh(combinedMesh);
                 finalMesh.name = "default";
+                
+                if(this.GenerateUVLightmap) Unwrapping.GenerateSecondaryUVSet(finalMesh);
 
                 ctx.AddObjectToAsset(finalMesh.name, finalMesh);
                 this.SetupMeshComponents(modelObject, finalMesh, materials, vmfMaterials);
@@ -439,6 +443,7 @@ namespace FailCake.VMF
 
             MeshRenderer meshRenderer = modelObject.AddComponent<MeshRenderer>();
             meshRenderer.materials = materials.ToArray();
+            meshRenderer.staticShadowCaster = true;
 
             if (!vmfMaterials) return;
 
