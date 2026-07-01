@@ -54,15 +54,15 @@ namespace FailCake.VMF
                     return;
                 }
 
-                if (VMFImporter.Settings.removeToolTextures && material.ToLower().StartsWith("tools/"))
-                    return;
+                var isTool = VMFImporter.Settings.removeToolTextures && material.ToLower().StartsWith("tools/");
 
                 Texture2D texture = null;
-                if (generateTextures) texture = VMFTextures.GetVMFTextureByName(material);
+                if (generateTextures && !isTool) texture = VMFTextures.GetVMFTextureByName(material);
 
                 var newSide = new VMFSide
                 {
                     isDisplacement = isDisplacementSide,
+                    isTool = isTool,
                     material = material
                 };
 
@@ -71,8 +71,14 @@ namespace FailCake.VMF
 
                 if (string.IsNullOrEmpty(uaxisStr) || string.IsNullOrEmpty(vaxisStr))
                 {
-                    Debug.LogWarning($"UV axes missing for side in solid {ID}");
-                    return;
+                    if (!isTool)
+                    {
+                        Debug.LogWarning($"UV axes missing for side in solid {ID}");
+                        return;
+                    }
+
+                    uaxisStr = "[1 0 0 0] 1";
+                    vaxisStr = "[0 1 0 0] 1";
                 }
 
                 var uAxis = new ParsedAxis(uaxisStr);

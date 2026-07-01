@@ -510,6 +510,7 @@ namespace FailCake.VMF
 
             var filteredSides = solid.sides
                 .Where(side =>
+                    !side.isTool &&
                     !string.IsNullOrEmpty(side.material) &&
                     (!VMFImporter.Settings.HasMaterialOverride(side.material) ||
                      side.material.Contains("LAYER_TEXTURE", StringComparison.OrdinalIgnoreCase))
@@ -712,6 +713,8 @@ namespace FailCake.VMF
             {
                 foreach (VMFSide side in solid.sides)
                 {
+                    if (side.isTool) continue; // Tool sides are collision-only, never rendered
+
                     string materialKey = this.GenerateTextures ? side.material : "__IGNORE__";
 
                     if (string.IsNullOrEmpty(materialKey)) continue;

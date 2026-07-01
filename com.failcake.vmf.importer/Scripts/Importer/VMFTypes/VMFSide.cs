@@ -15,6 +15,7 @@ namespace FailCake.VMF
         public int textureIndex;
 
         public bool isDisplacement;
+        public bool isTool;
 
         public List<Vertex> vertices = new List<Vertex>();
 
