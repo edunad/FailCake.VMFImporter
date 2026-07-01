@@ -1,9 +1,9 @@
 {
   "name": "com.failcake.vmf.importer",
   "displayName": "VMFImporter",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "unity": "6000.0",
-  "description": "Imports Valve Model Format (VMF) files into Unity. This package is a work in progress and may not support all features of the VMF format.",
+  "description": "Imports Valve Model Format (VMF) files into Unity",
   "type": "library",
   "keywords": [
     "3d",
@@ -19,5 +19,5 @@
   "dependencies": {
     "com.whinarn.unitymeshsimplifier": "3.1.0"
   },
-  "_fingerprint": "0da3680463e04b9e1d8dca53be11dedb02797659"
+  "_fingerprint": "e6957a3257ded7bfb60df6ef2802cd2ed2db1285"
 }

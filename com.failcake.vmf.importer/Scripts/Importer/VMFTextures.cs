@@ -5,14 +5,13 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEngine;
-using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 #endregion
 
 namespace FailCake.VMF
 {
-#if UNITY_EDITOR
+    #if UNITY_EDITOR
     internal enum MaterialType
     {
         OPAQUE = 0,
@@ -42,60 +41,54 @@ namespace FailCake.VMF
         public static readonly int TEXTURE_ARRAY_SIZE = 512;
 
 
-        public static void Init()
-        {
+        public static void Init() {
             // --- LOAD VPKS ---
-            Cleanup();
+            VMFTextures.Cleanup();
 
-            foreach (var vpkPath in VMFImporter.Settings.vpkFiles)
+            foreach (string vpkPath in VMFImporter.Settings.vpkFiles)
             {
-                if (string.IsNullOrEmpty(vpkPath) || VpkReaders.ContainsKey(vpkPath)) continue;
+                if (string.IsNullOrEmpty(vpkPath) || VMFTextures.VpkReaders.ContainsKey(vpkPath)) continue;
 
-                var reader = new VPKReader();
+                VPKReader reader = new VPKReader();
                 if (reader.Open(vpkPath))
                 {
                     Debug.Log($"Loaded VPK: {vpkPath}");
-                    VpkReaders[vpkPath] = reader;
+                    VMFTextures.VpkReaders[vpkPath] = reader;
                 }
                 else
-                {
                     Debug.LogError($"Failed to load VPK: {vpkPath}");
-                }
             }
             //---------
 
             // Setup error Texture
-            var errorTexture = VPKReader.CreateErrorTexture();
-            LoadedTextures.Add("__ERROR__", errorTexture);
+            Texture2D errorTexture = VPKReader.CreateErrorTexture();
+            VMFTextures.LoadedTextures.Add("__ERROR__", errorTexture);
             // ---------------------
         }
 
-        public static void Cleanup()
-        {
-            foreach (var reader in VpkReaders.Values)
-                reader?.Close();
+        public static void Cleanup() {
+            foreach (VPKReader reader in VMFTextures.VpkReaders.Values) reader?.Close();
 
-            VpkReaders.Clear();
-            LoadedTextures.Clear();
+            VMFTextures.VpkReaders.Clear();
+            VMFTextures.LoadedTextures.Clear();
         }
 
-        public static void PreloadTextures(HashSet<string> materials)
-        {
+        public static void PreloadTextures(HashSet<string> materials) {
             if (materials == null || materials.Count == 0) return;
 
-            foreach (var material in materials)
+            foreach (string material in materials)
             {
                 if (string.IsNullOrEmpty(material)) continue;
-                if (LoadedTextures.ContainsKey(material)) continue;
+                if (VMFTextures.LoadedTextures.ContainsKey(material)) continue;
 
                 Texture2D texture = null;
-                foreach (var vpk in VpkReaders.Values)
+                foreach (VPKReader vpk in VMFTextures.VpkReaders.Values)
                 {
                     if (vpk == null) continue;
 
                     try
                     {
-                        var file = vpk.GetFile($"{material}.vtf");
+                        VPKReader.EntryInfo file = vpk.GetFile($"{material}.vtf");
                         if (file == null) continue;
 
                         texture = vpk.LoadTexture(file);
@@ -110,49 +103,46 @@ namespace FailCake.VMF
                 if (!texture)
                 {
                     Debug.LogWarning($"Failed to find VTF material {material}");
-                    texture = LoadedTextures["__ERROR__"];
+                    texture = VMFTextures.LoadedTextures["__ERROR__"];
                 }
 
-                LoadedTextures[material] = texture;
+                VMFTextures.LoadedTextures[material] = texture;
             }
         }
 
-        public static Texture2D GetVMFTextureByName(string material)
-        {
-            if (LoadedTextures.TryGetValue(material, out var texture)) return texture;
-            if (LoadedTextures.TryGetValue("__ERROR__", out var errTexture)) return errTexture;
+        public static Texture2D GetVMFTextureByName(string material) {
+            if (VMFTextures.LoadedTextures.TryGetValue(material, out Texture2D texture)) return texture;
+            if (VMFTextures.LoadedTextures.TryGetValue("__ERROR__", out Texture2D errTexture)) return errTexture;
 
             throw new KeyNotFoundException($"Texture size for material '{material}' not found.");
         }
 
         public static Dictionary<string, TextureArrayInfo> CreateTextureArrays(AssetImportContext ctx,
-            Dictionary<MaterialType, List<List<string>>> materialBatches, ref List<Material> materials,
-            VMFMaterials vmfMaterials = null)
-        {
+            Dictionary<MaterialType, List<List<string>>> materialBatches, ref List<Material> materials) {
             if (materials == null) return null;
 
-            var mappings = new Dictionary<string, TextureArrayInfo>();
-            var shader = Shader.Find("FailCake/VMF/VMFLit") ??
-                         throw new UnityException("Shader not found: FailCake/VMF/VMFLit");
+            Dictionary<string, TextureArrayInfo> mappings = new Dictionary<string, TextureArrayInfo>();
+            Shader shader = Shader.Find("FailCake/VMF/VMFLit") ??
+                            throw new UnityException("Shader not found: FailCake/VMF/VMFLit");
 
-            var typeOffset = 0;
-            foreach (var materialGroup in materialBatches)
+            int typeOffset = 0;
+            foreach (KeyValuePair<MaterialType, List<List<string>>> materialGroup in materialBatches)
             {
-                var type = materialGroup.Key;
-                var batches = materialGroup.Value;
+                MaterialType type = materialGroup.Key;
+                List<List<string>> batches = materialGroup.Value;
 
-                for (var batchIndex = 0; batchIndex < batches.Count; batchIndex++)
+                for (int batchIndex = 0; batchIndex < batches.Count; batchIndex++)
                 {
-                    var batch = batches[batchIndex];
+                    List<string> batch = batches[batchIndex];
                     if (batch.Count == 0) continue;
 
                     Texture2DArray textureArray = null;
-                    if (type < MaterialType.CUSTOM) textureArray = CreateTextureArray(ctx, type, batchIndex, batch);
+                    if (type < MaterialType.CUSTOM) textureArray = VMFTextures.CreateTextureArray(ctx, type, batchIndex, batch);
 
-                    var overrideMaterial = ProcessTextures(textureArray, batch,
-                        vmfMaterials, batchIndex + typeOffset, mappings);
+                    Material overrideMaterial = VMFTextures.ProcessTextures(textureArray, batch,
+                        batchIndex + typeOffset, mappings);
 
-                    var material = CreateMaterial(ctx, type, batchIndex, shader,
+                    Material material = VMFTextures.CreateMaterial(ctx, type, batchIndex, shader,
                         textureArray, overrideMaterial);
 
                     materials.Add(material);
@@ -165,30 +155,26 @@ namespace FailCake.VMF
         }
 
         public static Dictionary<MaterialType, List<List<string>>> BatchMaterials(
-            Dictionary<MaterialType, List<string>> materialsByType)
-        {
+            Dictionary<MaterialType, List<string>> materialsByType) {
             if (materialsByType == null || materialsByType.Count == 0) return null;
 
-            var batches = new Dictionary<MaterialType, List<List<string>>>();
-            foreach (var kvp in materialsByType)
+            Dictionary<MaterialType, List<List<string>>> batches = new Dictionary<MaterialType, List<List<string>>>();
+            foreach (KeyValuePair<MaterialType, List<string>> kvp in materialsByType)
             {
-                var materialBatches = OptimizeBatching(kvp.Value);
+                List<List<string>> materialBatches = VMFTextures.OptimizeBatching(kvp.Value);
                 batches[kvp.Key] = materialBatches;
             }
 
             return batches;
         }
 
-        private static List<List<string>> OptimizeBatching(List<string> materials)
-        {
-            var batches = new List<List<string>>();
-            var currentBatch = new List<string>();
+        private static List<List<string>> OptimizeBatching(List<string> materials) {
+            List<List<string>> batches = new List<List<string>>();
+            List<string> currentBatch = new List<string>();
 
-            foreach (var material in materials)
-                if (currentBatch.Count < MAX_TEXTURES_PER_ARRAY)
-                {
+            foreach (string material in materials)
+                if (currentBatch.Count < VMFTextures.MAX_TEXTURES_PER_ARRAY)
                     currentBatch.Add(material);
-                }
                 else
                 {
                     if (currentBatch.Count > 0)
@@ -204,15 +190,14 @@ namespace FailCake.VMF
             return batches;
         }
 
-        public static Dictionary<MaterialType, List<string>> GroupMaterials(IEnumerable<string> materialNames)
-        {
+        public static Dictionary<MaterialType, List<string>> GroupMaterials(IEnumerable<string> materialNames) {
             if (materialNames == null) return null;
 
-            var materialsByType = new Dictionary<MaterialType, List<string>>();
-            var processedMaterials = new HashSet<string>();
+            Dictionary<MaterialType, List<string>> materialsByType = new Dictionary<MaterialType, List<string>>();
+            HashSet<string> processedMaterials = new HashSet<string>();
 
-            var customMaterialCount = 0;
-            foreach (var materialName in materialNames)
+            int customMaterialCount = 0;
+            foreach (string materialName in materialNames)
             {
                 if (string.IsNullOrEmpty(materialName)) continue;
                 if (materialName == "__IGNORE__") continue;
@@ -227,11 +212,11 @@ namespace FailCake.VMF
                     continue;
                 }
 
-                var texture = GetVMFTextureByName(materialName);
+                Texture2D texture = VMFTextures.GetVMFTextureByName(materialName);
                 if (!texture) continue;
 
-                var textureType = IsTextureAlpha(texture) ? MaterialType.TRANSPARENT : MaterialType.OPAQUE;
-                if (!materialsByType.TryGetValue(textureType, out var materialList))
+                MaterialType textureType = VMFTextures.IsTextureAlpha(texture) ? MaterialType.TRANSPARENT : MaterialType.OPAQUE;
+                if (!materialsByType.TryGetValue(textureType, out List<string> materialList))
                 {
                     materialList = new List<string>();
                     materialsByType[textureType] = materialList;
@@ -246,11 +231,9 @@ namespace FailCake.VMF
         #region PRIVATE
 
         private static Texture2DArray CreateTextureArray(AssetImportContext ctx, MaterialType type, int arrayIndex,
-            List<string> batch)
-        {
-            var textureArray = new Texture2DArray(TEXTURE_ARRAY_SIZE, TEXTURE_ARRAY_SIZE, batch.Count,
-                TextureFormat.DXT5, false, false)
-            {
+            List<string> batch) {
+            Texture2DArray textureArray = new Texture2DArray(VMFTextures.TEXTURE_ARRAY_SIZE, VMFTextures.TEXTURE_ARRAY_SIZE, batch.Count,
+                TextureFormat.DXT5, false, false) {
                 name = $"{type}_TextureArray_{arrayIndex}",
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Repeat
@@ -261,53 +244,47 @@ namespace FailCake.VMF
         }
 
         private static Material CreateMaterial(AssetImportContext ctx, MaterialType type, int arrayIndex, Shader shader,
-            Texture2DArray textureArray, Material overrideMaterial)
-        {
+            Texture2DArray textureArray, Material overrideMaterial) {
             Material material;
 
             if (overrideMaterial)
-            {
-                material = new Material(overrideMaterial)
-                {
+                material = new Material(overrideMaterial) {
                     parent = overrideMaterial,
                     name = $"{type}_OverrideMaterial_{arrayIndex}"
                 };
-            }
             else
             {
-                material = new Material(shader)
-                {
+                material = new Material(shader) {
                     name = $"{type}_Material_{arrayIndex}"
                 };
 
-                SetupMaterialProperties(material, type);
+                VMFTextures.SetupMaterialProperties(material, type);
             }
 
 
-            if (!overrideMaterial && material.HasTexture(MainTexture)) material.SetTexture(MainTexture, textureArray);
+            if (!overrideMaterial && material.HasTexture(VMFTextures.MainTexture)) material.SetTexture(VMFTextures.MainTexture, textureArray);
 
             ctx.AddObjectToAsset(material.name, material);
             return material;
         }
 
         private static Material ProcessTextures(Texture2DArray textureArray, List<string> batch,
-            VMFMaterials vmfMaterials, int batchOffset, Dictionary<string, TextureArrayInfo> mappings)
-        {
+            int batchOffset, Dictionary<string, TextureArrayInfo> mappings) {
             Material overrideMaterial = null;
 
-            for (var i = 0; i < batch.Count; i++)
+            for (int i = 0; i < batch.Count; i++)
             {
-                var materialName = batch[i];
+                string materialName = batch[i];
                 if (string.IsNullOrEmpty(materialName)) continue;
 
                 if (mappings.ContainsKey(materialName)) continue;
 
                 if (textureArray)
                 {
-                    var texture = GetVMFTextureByName(materialName);
+                    Texture2D texture = VMFTextures.GetVMFTextureByName(materialName);
                     if (!texture) continue;
 
-                    var uncompressedTexture = ResizeTexture(texture, TEXTURE_ARRAY_SIZE, TEXTURE_ARRAY_SIZE);
+                    Texture2D uncompressedTexture = VMFTextures.ResizeTexture(texture, VMFTextures.TEXTURE_ARRAY_SIZE, VMFTextures.TEXTURE_ARRAY_SIZE);
 
                     EditorUtility.CompressTexture(uncompressedTexture, TextureFormat.DXT5,
                         TextureCompressionQuality.Fast);
@@ -316,28 +293,24 @@ namespace FailCake.VMF
                     if (texture != uncompressedTexture) Object.DestroyImmediate(uncompressedTexture);
                 }
 
-                mappings[materialName] = new TextureArrayInfo
-                {
+                mappings[materialName] = new TextureArrayInfo {
                     ArrayIndex = batchOffset,
                     TextureIndex = i
                 };
 
-                if (vmfMaterials) StoreMaterialFootstep(vmfMaterials, materialName, batchOffset, i);
-                if (VMFImporter.Settings && !overrideMaterial)
-                    overrideMaterial = VMFImporter.Settings.GetMaterialOverride(materialName);
+                if (VMFImporter.Settings && !overrideMaterial) overrideMaterial = VMFImporter.Settings.GetMaterialOverride(materialName);
             }
 
             return overrideMaterial;
         }
 
-        private static Texture2D ResizeTexture(Texture2D source, int width, int height)
-        {
+        private static Texture2D ResizeTexture(Texture2D source, int width, int height) {
             if (!source) return null;
 
-            var resized = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            Texture2D resized = new Texture2D(width, height, TextureFormat.RGBA32, false);
 
-            var rt = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
-            var prevRT = RenderTexture.active;
+            RenderTexture rt = RenderTexture.GetTemporary(width, height, 0, RenderTextureFormat.ARGB32);
+            RenderTexture prevRT = RenderTexture.active;
 
             Graphics.Blit(source, rt);
             RenderTexture.active = rt;
@@ -352,50 +325,27 @@ namespace FailCake.VMF
             return resized;
         }
 
-        private static void StoreMaterialFootstep(
-            VMFMaterials vmfMaterials,
-            string materialName,
-            int arrayIndex,
-            int textureIndex)
-        {
-            var materialType = VMFMaterials.GetMaterialTexture(materialName);
-            var byteArrayIndex = (byte)arrayIndex;
-            var byteTextureIndex = (byte)textureIndex;
-
-            if (!vmfMaterials.materialDictionary.TryGetValue(byteArrayIndex,
-                    out var textureMaterials))
-            {
-                textureMaterials = new SerializedDictionary<byte, VMFMaterial>();
-                vmfMaterials.materialDictionary[byteArrayIndex] = textureMaterials;
-            }
-
-            textureMaterials[byteTextureIndex] = materialType;
-        }
-
-
-        private static void SetupMaterialProperties(Material material, MaterialType type)
-        {
+        private static void SetupMaterialProperties(Material material, MaterialType type) {
             if (type == MaterialType.TRANSPARENT)
             {
                 material.EnableKeyword("_ALPHATEST_ON");
-                material.SetFloat(Clip, 0.015f);
+                material.SetFloat(VMFTextures.Clip, 0.015f);
             }
             else
             {
                 material.DisableKeyword("_ALPHATEST_ON");
-                material.SetFloat(Clip, 0f);
+                material.SetFloat(VMFTextures.Clip, 0f);
             }
 
             material.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
             material.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
 
-            material.SetFloat(SpecularHighlights, 0);
-            material.SetFloat(EnvironmentReflections, 0);
-            material.SetFloat(GlossyReflections, 0);
+            material.SetFloat(VMFTextures.SpecularHighlights, 0);
+            material.SetFloat(VMFTextures.EnvironmentReflections, 0);
+            material.SetFloat(VMFTextures.GlossyReflections, 0);
         }
 
-        private static bool IsTextureAlpha(Texture2D texture)
-        {
+        private static bool IsTextureAlpha(Texture2D texture) {
             return texture.format == TextureFormat.RGBA32 ||
                    texture.format == TextureFormat.ARGB32 ||
                    texture.format == TextureFormat.RGBA4444 ||
@@ -405,5 +355,5 @@ namespace FailCake.VMF
 
         #endregion
     }
-#endif
+    #endif
 }

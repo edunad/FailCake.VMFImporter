@@ -1,11 +1,11 @@
 #region
 
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 #if UNITY_EDITOR
 using UnityEditor;
-using UnityEditor.AssetImporters;
 #endif
 
 #endregion
@@ -16,8 +16,7 @@ namespace FailCake.VMF
 
     internal static class VMFMesh
     {
-        public static Matrix4x4 GetDefaultTransform()
-        {
+        public static Matrix4x4 GetDefaultTransform() {
             // VMF to Unity coordinate system conversion
             // VMF: Z-up, right-handed -> Unity: Y-up, left-handed
             return Matrix4x4.TRS(
@@ -27,54 +26,11 @@ namespace FailCake.VMF
             );
         }
 
-        public static Mesh GenerateMesh(AssetImportContext ctx, Dictionary<string, List<VMFSide>> materialGroups, ref List<Material> generatedMaterials, VMFMaterials vmfMaterials = null)
-        {
-            if (materialGroups is not { Count: > 0 })
-            {
-                Debug.LogWarning("No material groups provided for mesh generation");
-                return null;
-            }
-
-            try
-            {
-                Dictionary<MaterialType, List<string>> groupMaterials = VMFTextures.GroupMaterials(materialGroups.Keys);
-
-                // Create batch groups - maximum 32 textures per array
-                Dictionary<string, TextureArrayInfo> textureArrayMappings = null;
-                Dictionary<MaterialType, List<List<string>>> materialBatches = VMFTextures.BatchMaterials(groupMaterials);
-
-                if (generatedMaterials != null && materialBatches?.Count > 0)
-                {
-                    textureArrayMappings = VMFTextures.CreateTextureArrays(ctx, materialBatches, ref generatedMaterials, vmfMaterials);
-                    if (textureArrayMappings is not { Count: > 0 })
-                    {
-                        Debug.LogWarning("No texture arrays created, proceeding without textures");
-                        // Continue without textures rather than failing completely
-                    }
-                }
-
-                // Generate mesh with texture arrays
-                return VMFMesh.GenerateMeshWithTextureArrays(materialGroups, textureArrayMappings);
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogError($"Error generating mesh: {ex.Message}");
-                return null;
-            }
-        }
-
-        public static Mesh GenerateMeshWithSharedTextures(Dictionary<string, List<VMFSide>> materialGroups, Dictionary<string, TextureArrayInfo> sharedTextureArrays)
-        {
+        public static Mesh GenerateMeshWithSharedTextures(Dictionary<string, List<VMFSide>> materialGroups, Dictionary<string, TextureArrayInfo> sharedTextureArrays) {
             if (materialGroups is not { Count: > 0 })
             {
                 Debug.LogWarning("No material groups provided for mesh generation with shared textures");
                 return null;
-            }
-
-            if (sharedTextureArrays == null)
-            {
-                Debug.LogWarning("No shared texture arrays provided, falling back to no-texture generation");
-                return VMFMesh.GenerateMeshWithTextureArrays(materialGroups, null);
             }
 
             return VMFMesh.GenerateMeshWithTextureArrays(materialGroups, sharedTextureArrays);
@@ -82,8 +38,7 @@ namespace FailCake.VMF
 
         #region PRIVATE
 
-        private static Mesh GenerateMeshWithTextureArrays(Dictionary<string, List<VMFSide>> materialGroups, Dictionary<string, TextureArrayInfo> textureArrayMappings)
-        {
+        private static Mesh GenerateMeshWithTextureArrays(Dictionary<string, List<VMFSide>> materialGroups, Dictionary<string, TextureArrayInfo> textureArrayMappings) {
             if (materialGroups is not { Count: > 0 })
             {
                 Debug.LogWarning("No material groups provided for mesh generation");
@@ -94,7 +49,6 @@ namespace FailCake.VMF
 
             // Process materials with texture array mappings
             if (textureArrayMappings?.Count > 0)
-            {
                 foreach (KeyValuePair<string, List<VMFSide>> materialEntry in materialGroups)
                 {
                     string materialName = materialEntry.Key;
@@ -113,27 +67,20 @@ namespace FailCake.VMF
 
                     // Set texture indices for each side
                     foreach (VMFSide side in materialEntry.Value)
-                    {
                         if (side != null)
                         {
                             side.textureIndex = info.TextureIndex;
                             side.materialIndex = info.ArrayIndex;
                             sides.Add(side);
                         }
-                    }
                 }
-            }
             else
             {
                 // Fallback: combine all materials into single submesh
                 submeshGroups[0] = new List<VMFSide>();
                 foreach (KeyValuePair<string, List<VMFSide>> materialEntry in materialGroups)
-                {
                     if (materialEntry.Value != null)
-                    {
                         submeshGroups[0].AddRange(materialEntry.Value);
-                    }
-                }
             }
 
             if (submeshGroups.Count == 0)
@@ -145,8 +92,7 @@ namespace FailCake.VMF
             return VMFMesh.CreateCombinedMesh(submeshGroups);
         }
 
-        private static Mesh CreateCombinedMesh(Dictionary<int, List<VMFSide>> submeshGroups)
-        {
+        private static Mesh CreateCombinedMesh(Dictionary<int, List<VMFSide>> submeshGroups) {
             List<CombineInstance> combineInstances = new List<CombineInstance>();
             List<int> materialIndices = new List<int>(submeshGroups.Keys);
             materialIndices.Sort();
@@ -166,19 +112,14 @@ namespace FailCake.VMF
                 {
                     Mesh submesh = VMFMesh.CreateSubmeshWithTextureIndices(sides);
                     if (submesh?.vertexCount > 0)
-                    {
-                        combineInstances.Add(new CombineInstance
-                        {
+                        combineInstances.Add(new CombineInstance {
                             mesh = submesh,
                             transform = transform
                         });
-                    }
                     else
-                    {
                         Debug.LogWarning($"Invalid submesh created for material index: {materialIndex}");
-                    }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError($"Error creating submesh for material index {materialIndex}: {ex.Message}");
                 }
@@ -192,8 +133,7 @@ namespace FailCake.VMF
 
             try
             {
-                Mesh combinedMesh = new Mesh
-                {
+                Mesh combinedMesh = new Mesh {
                     name = "vmf_combined_mesh",
                     indexFormat = IndexFormat.UInt32
                 };
@@ -207,19 +147,15 @@ namespace FailCake.VMF
 
                 return combinedMesh;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"Error combining meshes: {ex.Message}");
                 return null;
             }
         }
 
-        private static Mesh CreateSubmeshWithTextureIndices(List<VMFSide> sides)
-        {
-            if (sides is not { Count: > 0 })
-            {
-                return null;
-            }
+        private static Mesh CreateSubmeshWithTextureIndices(List<VMFSide> sides) {
+            if (sides is not { Count: > 0 }) return null;
 
             List<Vector3> vertices = new List<Vector3>();
             List<Vector3> normals = new List<Vector3>();
@@ -239,7 +175,6 @@ namespace FailCake.VMF
                 {
                     // Add vertices for this side
                     foreach (Vertex vert in side.vertices)
-                    {
                         if (vert != null)
                         {
                             vertices.Add(vert.position);
@@ -247,32 +182,24 @@ namespace FailCake.VMF
                             // Pack material and texture indices into UV.zw components
                             uvs.Add(new Vector4(vert.uv.x, vert.uv.y, side.materialIndex, side.textureIndex));
                         }
-                    }
 
                     // Add triangles for this side
-                    var sideTriangles = side.GetTriangles();
-                    foreach (int triIndex in sideTriangles)
-                    {
-                        triangles.Add(baseVertexIndex + triIndex);
-                    }
+                    List<int> sideTriangles = side.GetTriangles();
+                    foreach (int triIndex in sideTriangles) triangles.Add(baseVertexIndex + triIndex);
 
                     baseVertexIndex = vertices.Count;
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError($"Error processing side {side?.material ?? "unknown"}: {ex.Message}");
                 }
             }
 
-            if (vertices.Count == 0)
-            {
-                return null;
-            }
+            if (vertices.Count == 0) return null;
 
             try
             {
-                Mesh mesh = new Mesh
-                {
+                Mesh mesh = new Mesh {
                     name = "vmf_submesh",
                     indexFormat = IndexFormat.UInt32
                 };
@@ -285,7 +212,7 @@ namespace FailCake.VMF
 
                 return mesh;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 Debug.LogError($"Error creating submesh: {ex.Message}");
                 return null;

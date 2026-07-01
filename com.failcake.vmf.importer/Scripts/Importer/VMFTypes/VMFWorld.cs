@@ -2,8 +2,8 @@
 
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Linq;
+using UnityEngine;
 
 #endregion
 
@@ -27,7 +27,7 @@ namespace FailCake.VMF
 
             try
             {
-                this._worldBlock = this._root.Where(data => data.ID == "world").FirstOrDefault();
+                this._worldBlock = this._root.FirstOrDefault(data => data.ID == "world");
                 if (this._worldBlock == null) throw new UnityException("World block not found in VMF data - invalid VMF format");
 
                 this._solids = this._worldBlock.GetAllBlocks("solid").ToList();

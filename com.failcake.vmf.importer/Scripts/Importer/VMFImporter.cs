@@ -75,7 +75,7 @@ namespace FailCake.VMF
                 this._vmfWorld = new VMFWorld(root);
                 if (this.GenerateTextures) this._vmfWorld.LoadWorldTextures(this.GenerateEntities);
                 // --------------------------
-
+                
                 // WORLD SOLIDS
                 List<VMFSolid> worldSolids = this.ParseSolids(this._vmfWorld.GetSolids());
                 // --------------------------
@@ -120,7 +120,7 @@ namespace FailCake.VMF
             worldModel.transform.SetParent(rootModel.transform, false);
 
             Dictionary<string, List<VMFSide>> groupedSolids = this.GroupSolidsByMaterial(worldSolids);
-            if (groupedSolids?.Count > 0) this.GenerateModel(ctx, worldModel, groupedSolids, true, sharedTextureArrays, sharedMaterials);
+            if (groupedSolids?.Count > 0) this.GenerateModel(ctx, worldModel, groupedSolids, sharedTextureArrays, sharedMaterials);
         }
 
         private void ProcessEntitySolids(AssetImportContext ctx, GameObject rootModel, List<VMFSolid> entitySolids, Dictionary<string, TextureArrayInfo> sharedTextureArrays, List<Material> sharedMaterials) {
@@ -131,7 +131,7 @@ namespace FailCake.VMF
                 entityParent.transform.SetParent(rootModel.transform, false);
 
                 Dictionary<string, List<VMFSide>> groupedEntitySolids = this.GroupSolidsByMaterial(entityGroup.Value);
-                if (groupedEntitySolids?.Count > 0) this.GenerateModel(ctx, entityParent, groupedEntitySolids, true, sharedTextureArrays, sharedMaterials);
+                if (groupedEntitySolids?.Count > 0) this.GenerateModel(ctx, entityParent, groupedEntitySolids, sharedTextureArrays, sharedMaterials);
             }
         }
 
@@ -188,30 +188,122 @@ namespace FailCake.VMF
             colliderRoot.transform.SetParent(rootModel.transform, false);
             colliderRoot.isStatic = true;
 
-            var colliderData = solids
-                .Select(solid => (solid, bounds: this.GetBoundsForSolid(solid)))
-                .Where(x => x.bounds.HasValue && this.IsBoundsValid(x.bounds.Value))
-                .Select(x => (bounds: x.bounds.Value, material: calculateMaterials ? this.GetDominantMaterial(x.solid) : "default"));
+            List<(Bounds bounds, string material)> colliderData = new List<(Bounds, string)>();
+            List<(OrientedBox box, string material)> orientedData = new List<(OrientedBox, string)>();
 
-            int colliderIndex = 0;
-            foreach ((Bounds bounds, string material) data in colliderData) this.CreateColliderObject(data, colliderIndex++, colliderRoot);
+            foreach (VMFSolid solid in solids)
+            {
+                string material = calculateMaterials ? this.GetDominantMaterial(solid) : "default";
+                if (string.IsNullOrEmpty(material)) material = "default";
+
+                if (this.TryGetOrientedBox(solid, out OrientedBox box) && box.IsRotated)
+                {
+                    if (this.IsOrientedBoxValid(box)) orientedData.Add((box, material));
+                    continue;
+                }
+
+                Bounds? bounds = this.GetBoundsForSolid(solid);
+                if (!bounds.HasValue || !this.IsBoundsValid(bounds.Value)) continue;
+
+                colliderData.Add((bounds.Value, material));
+            }
+
+            int colliderId = 0;
+            List<(Bounds bounds, string material)> merged = this.MergeColliders(colliderData);
+            foreach (var entry in merged) this.CreateColliderObject(entry, colliderId++, colliderRoot);
+            foreach (var entry in orientedData) this.CreateOrientedColliderObject(entry.box, entry.material, colliderId++, colliderRoot);
+        }
+
+        private List<(Bounds bounds, string material)> MergeColliders(List<(Bounds bounds, string material)> input) {
+            List<(Bounds bounds, string material)> result = new List<(Bounds, string)>();
+            foreach (IGrouping<string, (Bounds bounds, string material)> group in input.GroupBy(x => x.material))
+            {
+                List<Bounds> boxes = group.Select(x => x.bounds).ToList();
+                VMFImporter.MergeBoxesInPlace(boxes);
+                foreach (Bounds b in boxes) result.Add((b, group.Key));
+            }
+            return result;
+        }
+
+        private static void MergeBoxesInPlace(List<Bounds> boxes) {
+            int i = 0;
+            while (i < boxes.Count)
+            {
+                bool merged = false;
+                for (int j = i + 1; j < boxes.Count; j++)
+                {
+                    if (!VMFImporter.TryMergeBounds(boxes[i], boxes[j], out Bounds result)) continue;
+
+                    boxes[i] = result;
+                    boxes.RemoveAt(j);
+                    merged = true;
+                    break;
+                }
+
+                if (!merged) i++;
+            }
+        }
+
+        private static bool TryMergeBounds(Bounds a, Bounds b, out Bounds result) {
+            const float eps = 0.001f;
+
+            if (VMFImporter.Contains(a, b, eps)) { result = a; return true; }
+            if (VMFImporter.Contains(b, a, eps)) { result = b; return true; }
+
+            for (int axis = 0; axis < 3; axis++)
+            {
+                int ax1 = (axis + 1) % 3;
+                int ax2 = (axis + 2) % 3;
+
+                if (Mathf.Abs(a.min[ax1] - b.min[ax1]) > eps) continue;
+                if (Mathf.Abs(a.max[ax1] - b.max[ax1]) > eps) continue;
+                if (Mathf.Abs(a.min[ax2] - b.min[ax2]) > eps) continue;
+                if (Mathf.Abs(a.max[ax2] - b.max[ax2]) > eps) continue;
+
+                if (a.max[axis] < b.min[axis] - eps) continue;
+                if (b.max[axis] < a.min[axis] - eps) continue;
+
+                Vector3 min = Vector3.Min(a.min, b.min);
+                Vector3 max = Vector3.Max(a.max, b.max);
+                result = new Bounds((min + max) * 0.5f, max - min);
+                return true;
+            }
+
+            result = default;
+            return false;
+        }
+
+        private static bool Contains(Bounds outer, Bounds inner, float eps) {
+            return outer.min.x <= inner.min.x + eps && outer.max.x >= inner.max.x - eps
+                && outer.min.y <= inner.min.y + eps && outer.max.y >= inner.max.y - eps
+                && outer.min.z <= inner.min.z + eps && outer.max.z >= inner.max.z - eps;
         }
 
         private Bounds? GetBoundsForSolid(VMFSolid solid) {
             if (solid?.sides == null || solid.sides.Count == 0) return null;
 
-            var vertices = solid.sides
-                .SelectMany(side => side.vertices)
-                .Select(vertex => VMFMesh.GetDefaultTransform().MultiplyPoint3x4(vertex.position));
+            Matrix4x4 transform = VMFMesh.GetDefaultTransform();
+            Vector3 min = Vector3.positiveInfinity;
+            Vector3 max = Vector3.negativeInfinity;
+            bool hasVertex = false;
 
-            if (!vertices.Any()) return null;
+            foreach (VMFSide side in solid.sides)
+            {
+                if (side?.vertices == null) continue;
 
-            Vector3 min = vertices.Aggregate(Vector3.positiveInfinity, Vector3.Min);
-            Vector3 max = vertices.Aggregate(Vector3.negativeInfinity, Vector3.Max);
-            Vector3 center = (min + max) * 0.5f;
-            Vector3 size = max - min;
+                foreach (Vertex vert in side.vertices)
+                {
+                    if (vert == null) continue;
 
-            return new Bounds(center, size);
+                    Vector3 pos = transform.MultiplyPoint3x4(vert.position);
+                    min = Vector3.Min(min, pos);
+                    max = Vector3.Max(max, pos);
+                    hasVertex = true;
+                }
+            }
+
+            if (!hasVertex) return null;
+            return new Bounds((min + max) * 0.5f, max - min);
         }
 
         private bool IsBoundsValid(Bounds bounds) {
@@ -233,6 +325,169 @@ namespace FailCake.VMF
             boxCollider.size = data.bounds.size;
 
             this.AddMaterialComponent(colliderObj, data.material);
+        }
+
+        private void CreateOrientedColliderObject(OrientedBox box, string material, int solidId, GameObject colliderRoot) {
+            GameObject colliderObj = new GameObject($"collider_{solidId}");
+
+            int collisionLayer = LayerMask.NameToLayer(VMFImporter.Settings.collisionMask);
+            if (collisionLayer != -1) colliderObj.layer = collisionLayer;
+
+            colliderObj.transform.SetParent(colliderRoot.transform, false);
+            colliderObj.transform.localPosition = box.center;
+            colliderObj.transform.localRotation = box.rotation;
+            colliderObj.isStatic = true;
+
+            BoxCollider boxCollider = colliderObj.AddComponent<BoxCollider>();
+            boxCollider.center = Vector3.zero;
+            boxCollider.size = box.size;
+
+            this.AddMaterialComponent(colliderObj, material);
+        }
+
+        private bool IsOrientedBoxValid(OrientedBox box) {
+            return box.size is { x: >= 0.01f, y: >= 0.01f, z: >= 0.01f };
+        }
+
+        private bool TryGetOrientedBox(VMFSolid solid, out OrientedBox box) {
+            box = default;
+            if (solid?.sides is not { Count: >= 3 }) return false;
+
+            Matrix4x4 transform = VMFMesh.GetDefaultTransform();
+
+            List<Vector3> corners = new List<Vector3>();
+            List<Vector3> axes = new List<Vector3>();
+
+            foreach (VMFSide side in solid.sides)
+            {
+                if (side == null || side.isDisplacement || side.vertices is not { Count: >= 3 }) return false;
+
+                Vector3 normal = VMFImporter.GetSideNormal(side, transform);
+                if (normal == Vector3.zero) return false;
+
+                VMFImporter.AddUniqueAxis(axes, normal);
+
+                foreach (Vertex vert in side.vertices)
+                {
+                    if (vert == null) continue;
+                    VMFImporter.AddUniqueCorner(corners, transform.MultiplyPoint3x4(vert.position));
+                }
+            }
+
+            if (corners.Count != 8 || axes.Count != 3) return false;
+            if (!VMFImporter.AreOrthogonal(axes[0], axes[1], axes[2])) return false;
+
+            Quaternion rotation = Quaternion.LookRotation(axes[2], axes[1]);
+
+            Vector3 right = rotation * Vector3.right;
+            Vector3 up = rotation * Vector3.up;
+            Vector3 forward = rotation * Vector3.forward;
+
+            Vector3 min = Vector3.positiveInfinity;
+            Vector3 max = Vector3.negativeInfinity;
+
+            foreach (Vector3 corner in corners)
+            {
+                Vector3 projected = new Vector3(Vector3.Dot(corner, right), Vector3.Dot(corner, up), Vector3.Dot(corner, forward));
+                min = Vector3.Min(min, projected);
+                max = Vector3.Max(max, projected);
+            }
+
+            const float tol = 0.001f;
+            foreach (Vector3 corner in corners)
+            {
+                float r = Vector3.Dot(corner, right);
+                float u = Vector3.Dot(corner, up);
+                float f = Vector3.Dot(corner, forward);
+
+                bool onR = Mathf.Abs(r - min.x) <= tol || Mathf.Abs(r - max.x) <= tol;
+                bool onU = Mathf.Abs(u - min.y) <= tol || Mathf.Abs(u - max.y) <= tol;
+                bool onF = Mathf.Abs(f - min.z) <= tol || Mathf.Abs(f - max.z) <= tol;
+                if (!onR || !onU || !onF) return false;
+            }
+
+            Vector3 mid = (min + max) * 0.5f;
+            box = new OrientedBox(right * mid.x + up * mid.y + forward * mid.z, max - min, rotation);
+            return true;
+        }
+
+        private static Vector3 GetSideNormal(VMFSide side, Matrix4x4 transform) {
+            List<Vector3> polygon = new List<Vector3>();
+            foreach (Vertex vert in side.vertices)
+            {
+                if (vert == null) continue;
+                VMFImporter.AddUniqueCorner(polygon, transform.MultiplyPoint3x4(vert.position));
+            }
+
+            if (polygon.Count < 3) return Vector3.zero;
+
+            Vector3 normal = Vector3.zero;
+            for (int i = 0; i < polygon.Count; i++)
+            {
+                Vector3 current = polygon[i];
+                Vector3 next = polygon[(i + 1) % polygon.Count];
+
+                normal.x += (current.y - next.y) * (current.z + next.z);
+                normal.y += (current.z - next.z) * (current.x + next.x);
+                normal.z += (current.x - next.x) * (current.y + next.y);
+            }
+
+            return normal.sqrMagnitude > 1e-10f ? normal.normalized : Vector3.zero;
+        }
+
+        private static void AddUniqueAxis(List<Vector3> axes, Vector3 normal) {
+            foreach (Vector3 axis in axes)
+                if (Mathf.Abs(Vector3.Dot(axis, normal)) > 0.999f) return;
+
+            axes.Add(normal);
+        }
+
+        private static void AddUniqueCorner(List<Vector3> corners, Vector3 position) {
+            foreach (Vector3 corner in corners)
+                if ((corner - position).sqrMagnitude < 1e-8f) return;
+
+            corners.Add(position);
+        }
+
+        private static bool AreOrthogonal(Vector3 a, Vector3 b, Vector3 c) {
+            const float tol = 0.02f;
+            return Mathf.Abs(Vector3.Dot(a, b)) < tol
+                && Mathf.Abs(Vector3.Dot(b, c)) < tol
+                && Mathf.Abs(Vector3.Dot(a, c)) < tol;
+        }
+
+        private static bool IsWorldAligned(Vector3 v) {
+            const float tol = 0.001f;
+            int alignedAxes = 0;
+
+            if (Mathf.Abs(Mathf.Abs(v.x) - 1f) < tol) alignedAxes++;
+            else if (Mathf.Abs(v.x) > tol) return false;
+
+            if (Mathf.Abs(Mathf.Abs(v.y) - 1f) < tol) alignedAxes++;
+            else if (Mathf.Abs(v.y) > tol) return false;
+
+            if (Mathf.Abs(Mathf.Abs(v.z) - 1f) < tol) alignedAxes++;
+            else if (Mathf.Abs(v.z) > tol) return false;
+
+            return alignedAxes == 1;
+        }
+
+        private readonly struct OrientedBox
+        {
+            public readonly Vector3 center;
+            public readonly Vector3 size;
+            public readonly Quaternion rotation;
+
+            public OrientedBox(Vector3 center, Vector3 size, Quaternion rotation) {
+                this.center = center;
+                this.size = size;
+                this.rotation = rotation;
+            }
+
+            public bool IsRotated =>
+                !(VMFImporter.IsWorldAligned(this.rotation * Vector3.right)
+                  && VMFImporter.IsWorldAligned(this.rotation * Vector3.up)
+                  && VMFImporter.IsWorldAligned(this.rotation * Vector3.forward));
         }
 
         private void AddMaterialComponent(GameObject colliderObj, string material) {
@@ -284,8 +539,8 @@ namespace FailCake.VMF
             Dictionary<string, GameObject> entityOverrides = VMFImporter.Settings.GetEntityOverrides();
             Matrix4x4 transformMatrix = VMFMesh.GetDefaultTransform();
 
-            foreach (VMFDataBlock entity in entities)
-                if (!this.TryCreateEntity(entity, entityOverrides, transformMatrix, rootModel)) { }
+            foreach (VMFDataBlock entity in entities) 
+				this.TryCreateEntity(entity, entityOverrides, transformMatrix, rootModel);
         }
 
         private bool TryCreateEntity(VMFDataBlock entity, Dictionary<string, GameObject> entityOverrides,
@@ -372,28 +627,26 @@ namespace FailCake.VMF
             return null;
         }
 
-        private void GenerateModel(AssetImportContext ctx, GameObject modelObject, Dictionary<string, List<VMFSide>> groupedSolids, bool generateMaterialData, Dictionary<string, TextureArrayInfo> sharedTextureArrays = null,
+        private void GenerateModel(AssetImportContext ctx, GameObject modelObject, Dictionary<string, List<VMFSide>> groupedSolids, Dictionary<string, TextureArrayInfo> sharedTextureArrays = null,
             List<Material> sharedMaterials = null) {
             if (groupedSolids is not { Count: > 0 }) return;
 
             try
             {
                 VMFMaterials vmfMaterials = null;
-                if (this.GenerateTextures && this.GenerateMaterialData && generateMaterialData) vmfMaterials = modelObject.AddComponent<VMFMaterials>();
+                if (this.GenerateTextures && this.GenerateMaterialData) vmfMaterials = modelObject.AddComponent<VMFMaterials>();
 
                 List<Material> materials = null;
-                if (this.GenerateTextures && generateMaterialData) materials = sharedMaterials?.Count > 0 ? sharedMaterials : new List<Material>();
+                if (this.GenerateTextures) materials = sharedMaterials?.Count > 0 ? sharedMaterials : new List<Material>();
 
                 Mesh combinedMesh;
-                if (this.GenerateTextures && sharedTextureArrays != null && generateMaterialData)
+                if (this.GenerateTextures && sharedTextureArrays != null)
                 {
                     combinedMesh = VMFMesh.GenerateMeshWithSharedTextures(groupedSolids, sharedTextureArrays);
 
                     if (vmfMaterials) this.PopulateSharedMaterialDictionary(vmfMaterials, groupedSolids, sharedTextureArrays);
                     if (materials != null && combinedMesh) materials = this.CreateMaterialsForSharedArrays(sharedMaterials, groupedSolids, sharedTextureArrays);
                 }
-                else if (this.GenerateTextures)
-                    combinedMesh = VMFMesh.GenerateMesh(ctx, groupedSolids, ref materials, vmfMaterials);
                 else
                     combinedMesh = VMFMesh.GenerateMeshWithSharedTextures(groupedSolids, null);
 
