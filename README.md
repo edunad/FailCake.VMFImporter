@@ -25,11 +25,11 @@
 > [!IMPORTANT]
 > Requires the [UnityMeshSimplifier](https://github.com/Whinarn/UnityMeshSimplifier) package (to simplify the meshes)
 
-<img width="512" height="512" alt="{F9280638-B3EB-4238-BFB4-7B0228BD40B1}" src="https://i.rawr.dev/O7lmnfXlCI.gif" />
-<img width="712" height="157" alt="{6D9959EA-294A-4093-ADE8-F6AD30858708}" src="https://github.com/user-attachments/assets/c2522b95-f474-4d91-a805-2cbad3c0f993" />
+<img width="512" alt="{F9280638-B3EB-4238-BFB4-7B0228BD40B1}" src="https://i.rawr.dev/O7lmnfXlCI.gif" />
+<img width="712" alt="{6D9959EA-294A-4093-ADE8-F6AD30858708}" src="https://github.com/user-attachments/assets/c2522b95-f474-4d91-a805-2cbad3c0f993" />
 
 ## Installation
-<img width="256" height="256" src="https://github.com/user-attachments/assets/5d3fcc53-d3b5-4938-94b6-9974f772c646" />
+<img width="256" src="https://github.com/user-attachments/assets/5d3fcc53-d3b5-4938-94b6-9974f772c646" />
 
 Open Unity's Package Manager and add a new Git URL:
 ```
