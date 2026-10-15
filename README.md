@@ -20,7 +20,7 @@
 > THIS ONLY WORKS WITH [HAMMER++](https://ficool2.github.io/HammerPlusPlus-Website/). Regular Hammer isn't supported.
 
 > [!IMPORTANT]
-> Originally built for a game made by a friend [Delivery & Beyond](https://store.steampowered.com/app/3376480/Delivery__Beyond/), not really intended for public use. But after thinking about it, figured I'd share it anyway. Some stuff is still hardcoded for the game, but eventually I want to turn this into a proper plugin.
+> Originally built for [Delivery & Beyond](https://store.steampowered.com/app/3376480/Delivery__Beyond/), not really intended for public use. But after thinking about it, figured I'd share it anyway. Some stuff is still hardcoded for the game, but eventually I want to turn this into a proper plugin.
 
 > [!IMPORTANT]
 > Requires the [UnityMeshSimplifier](https://github.com/Whinarn/UnityMeshSimplifier) package (to simplify the meshes)
